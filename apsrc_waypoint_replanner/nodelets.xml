@@ -1,0 +1,9 @@
+<library path="lib/libapsrc_waypoint_replanner_nodelets">
+  <class name="apsrc_waypoint_replanner/apsrc_waypoint_replanner_nodelet"
+         type="apsrc_waypoint_replanner::ApsrcWaypointReplannerNl"
+         base_class_type="nodelet::Nodelet">
+    <description>
+      Dynamic velocity profile waypoint replanner
+    </description>
+  </class>
+</library>

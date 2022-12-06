@@ -1,0 +1,5 @@
+<launch>
+  <node pkg="apsrc_waypoint_replanner" type="apsrc_waypoint_replanner_node" name="apsrc_waypoint_replanner" output="screen" />
+
+  <rosparam command="load" file="$(find apsrc_waypoint_replanner)/config/params.yaml" />
+</launch>
