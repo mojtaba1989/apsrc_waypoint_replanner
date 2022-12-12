@@ -23,7 +23,7 @@ if __name__ == '__main__':
     print(msg.pack())
     data, address = s.recvfrom(4096)
     idx = 0
-    msg_id, type, num_wps, fist_wp_id = unpack('>BBBi', data[idx:idx+7])
+    msg_id, type, num_wps, fist_wp_id = unpack('<BBBi', data[idx:idx+7])
     idx = idx+7
     print("(msg_id, type, num_wps, fist_wp_id) =", (msg_id, type, num_wps, fist_wp_id))
     for i in range(num_wps):

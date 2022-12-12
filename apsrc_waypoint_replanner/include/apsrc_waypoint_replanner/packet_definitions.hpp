@@ -16,8 +16,8 @@ struct waypoint_t {
   float z = 0;
   float yaw = 0;
   float  velocity = 0;
-  uint8_t change_flag = 0;
-};//25 bytes
+  uint32_t change_flag = 0;
+};//28 bytes
 
 class WaypointsArray
 {
@@ -37,8 +37,8 @@ public:
     buffer[1] = type;
     buffer[2] = num_waypoints;
     std::memcpy(&buffer[3], &first_global_waypoint_id, sizeof(first_global_waypoint_id));
-    std::memcpy(&buffer[7], waypoints_array, 2500);
-    std::memcpy(&buffer[2507], reserved, sizeof(reserved));
+    std::memcpy(&buffer[7], waypoints_array, 2800);
+    std::memcpy(&buffer[2807], reserved, sizeof(reserved));
 
     boost::crc_32_type msg_crc;
     msg_crc.process_bytes(&buffer[0], 2817);
@@ -53,12 +53,12 @@ public:
     type = buffer[1];
     num_waypoints = buffer[2];
     std::memcpy(&first_global_waypoint_id, &buffer[3], sizeof(first_global_waypoint_id));
-    std::memcpy(waypoints_array, &buffer[7], sizeof(waypoints_array));
-    std::memcpy(reserved, &buffer[2507], sizeof(reserved));
-    std::memcpy(&crc, &buffer[2517], sizeof(crc));
+    std::memcpy(waypoints_array, &buffer[7], 2800);
+    std::memcpy(reserved, &buffer[2807], sizeof(reserved));
+    std::memcpy(&crc, &buffer[2817], sizeof(crc));
 
     boost::crc_32_type msg_crc;
-    msg_crc.process_bytes(&buffer[0], 2517);
+    msg_crc.process_bytes(&buffer[0], 2817);
     if (crc == msg_crc.checksum())
     {
         return true;

@@ -40,12 +40,13 @@ private:
   void closestWaypointCallback(const std_msgs::Int32::ConstPtr& closest_waypoint_id);
   void baseWaypointsCallback(const autoware_msgs::Lane::ConstPtr& base_waypoints);
 
-  // UDP server callback for new data received
+  // UDP server callback for received message
   std::vector<uint8_t> handleServerResponse(const std::vector<uint8_t>& received_payload);
 
   // Util functions
   bool startServer();
   void generateGlobalPath(DVPMod::VelocityProfile velocity_profile);
+  std::vector<uint8_t> UDPGlobalPathShare(autoware_msgs::Lane_<std::allocator<void>> waypoints); // msg_type:1
 
   // Nodehandles
   ros::NodeHandle nh_, pnh_;
@@ -61,7 +62,6 @@ private:
 
   // Internal state
   AS::Network::UDPServer udp_server_;
-  AS::Network::UDPInterface udp_inetrface_;
   std::thread udp_server_thread_;
   std::mutex waypoints_mtx_;
   std::mutex status_data_mtx_;
