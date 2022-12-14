@@ -26,7 +26,6 @@ void ApsrcWaypointReplannerNl::onInit()
   loadParams();
 
   // Publishers
-  max_waypoints_pub_ = nh_.advertise<autoware_msgs::LaneArray>("based/lane_waypoints_raw", 10, true);
   mod_waypoints_pub_ = nh_.advertise<autoware_msgs::Lane>("base_waypoints", 10, true);
 
   // Subscribers
@@ -68,15 +67,19 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::handleServerResponse(const std::v
   }
   else
   {
+    std::vector<uint8_t> udp_msg;
     switch (requestMsg.request_id) {
       case 1: // request for waypoints from spectra
-        ROS_INFO("Received Request for Sharing WayPoint");
-        std::vector<uint8_t> udp_msg =
-                ApsrcWaypointReplannerNl::UDPGlobalPathShare(autoware_msgs::Lane_<std::allocator<void>>
-                (ApsrcWaypointReplannerNl::current_waypoints_));
-        ROS_INFO("Message Sent");
-        return udp_msg;
+        ROS_INFO("Received request: sharing waypoint");
+        udp_msg = ApsrcWaypointReplannerNl::UDPGlobalPathShare(current_waypoints_);
+        break;
+
+      case 2: // request for velocity modification
+        ROS_INFO("Received request: velocity modification");
+        udp_msg = ApsrcWaypointReplannerNl::UDPVelocityModify(requestMsg);
+        break;
     }
+    return udp_msg;
   }
 }
 
@@ -144,7 +147,7 @@ bool ApsrcWaypointReplannerNl::startServer()
   }
   else
   {
-    ROS_INFO("UDP server started");
+    ROS_INFO("UDP server started at %s (%s)",server_ip_.c_str(), std::to_string(server_port_).c_str());
     udp_server_.registerReceiveHandler(
         std::bind(&ApsrcWaypointReplannerNl::handleServerResponse, this, std::placeholders::_1));
 
@@ -158,14 +161,14 @@ void ApsrcWaypointReplannerNl::baseWaypointsCallback(const autoware_msgs::Lane::
   {
     std::unique_lock<std::mutex> wp_lock(waypoints_mtx_);
     base_waypoints_ = *base_waypoints;
-    autoware_msgs::Lane max_waypoints = *base_waypoints;
-    for (auto& waypoint : max_waypoints.waypoints)
-    {
-      waypoint.twist.twist.linear.x = max_speed_;
-    }
-
-    mod_waypoints_pub_.publish(max_waypoints);
-    current_waypoints_ = max_waypoints;
+    autoware_msgs::Lane mod_waypoints = *base_waypoints;
+//    for (auto& waypoint : max_waypoints.waypoints)
+//    {
+//      waypoint.twist.twist.linear.x = max_speed_;
+//    }
+//
+    mod_waypoints_pub_.publish(base_waypoints_);
+    current_waypoints_ = mod_waypoints;
     received_base_waypoints_ = true;
   }
 }
@@ -195,31 +198,85 @@ void ApsrcWaypointReplannerNl::closestWaypointCallback(const std_msgs::Int32::Co
 std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPGlobalPathShare(autoware_msgs::Lane_<std::allocator<void>> waypoints)
 {
   std::unique_lock<std::mutex> status_lock(status_data_mtx_);
-  int32_t start_id = closest_waypoint_id_;
-  ROS_INFO("closes wp: %s", std::to_string(closest_waypoint_id_).c_str());
+  if (received_base_waypoints_ and closest_waypoint_id_!=-1) {
+    int32_t start_id = closest_waypoint_id_;
+    status_lock.unlock();
 
-  std::unique_lock<std::mutex> wp_lock(waypoints_mtx_);
-  autoware_msgs::Lane temp_waypoints = waypoints;
+    std::unique_lock<std::mutex> wp_lock(waypoints_mtx_);
+    autoware_msgs::Lane temp_waypoints = waypoints;
 
-  DVPMod::WaypointsArray udp_msg;
-  udp_msg.msg_id = msg_id_;
-  udp_msg.type = 1;
-  udp_msg.num_waypoints = (temp_waypoints.waypoints.size() - start_id < 100) ? temp_waypoints.waypoints.size() - start_id:100;
-  udp_msg.first_global_waypoint_id = start_id;
-  udp_msg.crc = 0;
-  for (uint i = 0; i < udp_msg.num_waypoints; i++)
-  {
-    uint wp_id = i + start_id;
-    udp_msg.waypoints_array[i].waypoint_id = temp_waypoints.waypoints[wp_id].gid;
-    udp_msg.waypoints_array[i].x           = temp_waypoints.waypoints[wp_id].pose.pose.position.x;
-    udp_msg.waypoints_array[i].y           = temp_waypoints.waypoints[wp_id].pose.pose.position.y;
-    udp_msg.waypoints_array[i].z           = temp_waypoints.waypoints[wp_id].pose.pose.position.z;
-    udp_msg.waypoints_array[i].yaw         = tf::getYaw(temp_waypoints.waypoints[wp_id].pose.pose.orientation);
-    udp_msg.waypoints_array[i].velocity    = temp_waypoints.waypoints[wp_id].twist.twist.linear.x;
-    udp_msg.waypoints_array[i].change_flag = temp_waypoints.waypoints[wp_id].change_flag;
+    DVPMod::WaypointsArray udp_msg;
+    udp_msg.msg_id = msg_id_;
+    udp_msg.type = 1;
+    udp_msg.num_waypoints = (temp_waypoints.waypoints.size() - start_id < 100) ? temp_waypoints.waypoints.size() -
+                                                                                 start_id : 100;
+    udp_msg.first_global_waypoint_id = start_id;
+    udp_msg.crc = 0;
+    for (uint i = 0; i < udp_msg.num_waypoints; i++) {
+      uint wp_id = i + start_id;
+      udp_msg.waypoints_array[i].waypoint_id = temp_waypoints.waypoints[wp_id].gid;
+      udp_msg.waypoints_array[i].x = temp_waypoints.waypoints[wp_id].pose.pose.position.x;
+      udp_msg.waypoints_array[i].y = temp_waypoints.waypoints[wp_id].pose.pose.position.y;
+      udp_msg.waypoints_array[i].z = temp_waypoints.waypoints[wp_id].pose.pose.position.z;
+      udp_msg.waypoints_array[i].yaw = tf::getYaw(temp_waypoints.waypoints[wp_id].pose.pose.orientation);
+      udp_msg.waypoints_array[i].velocity = temp_waypoints.waypoints[wp_id].twist.twist.linear.x;
+      udp_msg.waypoints_array[i].change_flag = temp_waypoints.waypoints[wp_id].change_flag;
+    }
+    ROS_INFO("%s Following Waypoints has shared, starting %s", std::to_string(udp_msg.num_waypoints).c_str(),
+             std::to_string(udp_msg.first_global_waypoint_id).c_str());
+    return udp_msg.pack();
   }
+  else
+  {
+    status_lock.unlock();
+    DVPMod::WaypointsArray udp_msg;
+    ROS_WARN("No Waypoints to Share");
+    return udp_msg.pack();
+  }
+}
 
-  return udp_msg.pack();
+std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPVelocityModify(DVPMod::RequestMsgs request) {
+  DVPMod::StatusReply reply={};
+  if (request.request_id!=2){
+    ROS_ERROR("Bad Message Handler");
+  } else{
+    std::unique_lock<std::mutex> status_lock(status_data_mtx_);
+    if (received_base_waypoints_ and closest_waypoint_id_){
+      int32_t start_id = closest_waypoint_id_;
+      status_lock.unlock();
+
+      uint32_t end_id =
+              request.reserved.waypoint_id + request.reserved.number_of_waypoints < base_waypoints_.waypoints.size() ?
+              request.reserved.waypoint_id + request.reserved.number_of_waypoints - 1: base_waypoints_.waypoints.size() - 1;
+      uint32_t where_to_start = request.reserved.waypoint_id > start_id ? request.reserved.waypoint_id:start_id;
+
+      std::unique_lock<std::mutex> wp_lock(waypoints_mtx_);
+      switch (request.reserved.action) {
+        case 0: //Modify
+          for (int i = where_to_start; i <= end_id; i++) {
+            base_waypoints_.waypoints[i].twist.twist.linear.x =
+                    std::min(max_speed_, base_waypoints_.waypoints[i].twist.twist.linear.x + request.reserved.magnitude);
+          }
+          ROS_INFO("Following Waypoints has been modified by %s: %s->%s", std::to_string(request.reserved.magnitude).c_str(),
+                   std::to_string(where_to_start).c_str(), std::to_string(end_id).c_str());
+          break;
+        case 1: // Set
+          for (int i = where_to_start; i <= end_id; i++) {
+            base_waypoints_.waypoints[i].twist.twist.linear.x = std::min(max_speed_, static_cast<double>(request.reserved.magnitude));
+          }
+          ROS_INFO("Following Waypoints has been set by %s: %s->%s", std::to_string(request.reserved.magnitude).c_str(),
+                   std::to_string(where_to_start).c_str(), std::to_string(end_id).c_str());
+          break;
+      }
+      mod_waypoints_pub_.publish(base_waypoints_);
+
+      std::unique_lock<std::mutex> lock(status_data_mtx_);
+      reply.data_valid = true;
+      reply.closest_global_waypoint_id = closest_waypoint_id_;
+      reply.current_velocity = current_velocity_;
+    }
+  }
+  return reply.pack();
 }
 }  // namespace apsrc_waypoint_replanner
 

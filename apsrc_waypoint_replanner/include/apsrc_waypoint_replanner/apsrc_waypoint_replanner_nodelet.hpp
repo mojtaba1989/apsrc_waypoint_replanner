@@ -42,17 +42,18 @@ private:
 
   // UDP server callback for received message
   std::vector<uint8_t> handleServerResponse(const std::vector<uint8_t>& received_payload);
+  std::vector<uint8_t> UDPGlobalPathShare(autoware_msgs::Lane_<std::allocator<void>> waypoints); // msg_type:1
+  std::vector<uint8_t> UDPVelocityModify(DVPMod::RequestMsgs request); // msg_type:2
 
   // Util functions
   bool startServer();
   void generateGlobalPath(DVPMod::VelocityProfile velocity_profile);
-  std::vector<uint8_t> UDPGlobalPathShare(autoware_msgs::Lane_<std::allocator<void>> waypoints); // msg_type:1
 
   // Nodehandles
   ros::NodeHandle nh_, pnh_;
 
   // Publishers
-  ros::Publisher max_waypoints_pub_, mod_waypoints_pub_;
+  ros::Publisher mod_waypoints_pub_;
 
 
   // Subscribers

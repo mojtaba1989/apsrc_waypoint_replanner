@@ -10,15 +10,20 @@ class req_msg:
         self.request_id = (request_id, )
         self.reserved = (0, ) * 10
     def pack(self):
-        b_msg = pack('!12b', *list(self.msg_id + self.request_id + self.reserved))
-        crc = pack('I', int(hex(zlib.crc32(b_msg) & 0xffffffff), base=16))
+        if self.request_id[0] == 1:
+            b_msg = pack('=12b', *list(self.msg_id + self.request_id + self.reserved))
+            crc = pack('I', int(hex(zlib.crc32(b_msg) & 0xffffffff), base=16))
+        elif self.request_id[0] == 2:
+            b_msg = pack('=bbIBBf', *list(self.msg_id + self.request_id + self.reserved))
+            crc = pack('I', int(hex(zlib.crc32(b_msg) & 0xffffffff), base=16))
         return b_msg + crc
 
 socket_address = ('127.0.0.1', 1551)
-msg = req_msg(1)
+
 
 if __name__ == '__main__':
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, 0)
+    msg = req_msg(1)
     s.sendto(msg.pack(), socket_address)
     print(msg.pack())
     data, address = s.recvfrom(4096)
@@ -30,5 +35,10 @@ if __name__ == '__main__':
         wp_id, x, y, z, yaw, velocity, change_flag = unpack("ifffffi", data[idx:idx+28])
         print("(wp_id, x, y, z, yaw, velocity, change_flag) = ", (wp_id, x, y, z, yaw, velocity, change_flag))
         idx = idx+28
+    msg = req_msg(2)
+    msg.reserved = (20, 100, 1, 0)
+    time.sleep(5)
+    print(msg.pack(), len(msg.pack()))
+    s.sendto(msg.pack(), socket_address)
     s.close
 

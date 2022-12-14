@@ -19,6 +19,13 @@ struct waypoint_t {
   uint32_t change_flag = 0;
 };//28 bytes
 
+struct reserved_t {
+    uint32_t waypoint_id = 0;
+    uint8_t number_of_waypoints = 0;
+    uint8_t action = 0;
+    float magnitude = 0;
+}; //10 bytes
+
 class WaypointsArray
 {
 public:
@@ -75,7 +82,7 @@ class RequestMsgs
 public:
   uint8_t msg_id;
   uint8_t request_id;
-  uint8_t reserved[10];
+  struct reserved_t reserved;
   uint32_t crc;
 
   std::vector<uint8_t> pack()
@@ -83,7 +90,7 @@ public:
     std::vector<uint8_t> buffer(16);
     buffer[0] = msg_id;
     buffer[1] = request_id;
-    std::memcpy(&buffer[2], reserved, sizeof(reserved));
+    std::memcpy(&buffer[2], &reserved, sizeof(reserved));
 
     // Calculate CRC
     boost::crc_32_type msg_crc;
@@ -99,7 +106,10 @@ public:
   {
     msg_id = buffer[0];
     request_id = buffer[1];
-    std::memcpy(reserved, &buffer[2], sizeof(reserved));
+    std::memcpy(&reserved.waypoint_id, &buffer[2], 4);
+    std::memcpy(&reserved.number_of_waypoints, &buffer[6], 1);
+    std::memcpy(&reserved.action, &buffer[7], 1);
+    std::memcpy(&reserved.magnitude, &buffer[8], 4);
     std::memcpy(&crc, &buffer[12], sizeof(crc));
     boost::crc_32_type msg_crc;
     msg_crc.process_bytes(&buffer[0], 12);

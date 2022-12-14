@@ -4,7 +4,7 @@ waypoint_replanner:
   server_port: 1551
 
   # Max speed of all waypoints (km/h)
-  max_speed: 20.0
+  max_speed: 2.0
 
   # Time Out duration (s)
-  time_out: 0.5
+  time_out: 1.0
