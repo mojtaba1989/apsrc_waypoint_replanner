@@ -45,6 +45,7 @@ private:
   std::vector<uint8_t> UDPGlobalPathShare(DVPMod::RequestMsgs request); // msg_type:1
   std::vector<uint8_t> UDPVelocityModify(DVPMod::RequestMsgs request); // msg_type:2
   std::vector<uint8_t> UDPPositionModify(DVPMod::RequestMsgs request); // msg_type:3
+  std::vector<uint8_t> UDPStatusShare(DVPMod::RequestMsgs request); // msg_type:4
 
   // Util functions
   bool startServer();

@@ -18,20 +18,30 @@ namespace DVPMod {
         uint32_t change_flag = 0;
     };//28 bytes
 
+    struct smoothing_ctrl_t {
+        uint8_t beginning; //1:fix steps 2: fix number
+        uint8_t ending; //1:fix steps 2: fix number
+        float beginning_smoothing_extra;
+        float ending__smoothing_extra;
+    }; // 10 bytes
+
     struct velocityCMD_t {
-        uint32_t waypoint_id = 0;
+        int32_t waypoint_id = 0;
         uint8_t number_of_waypoints = 0;
         uint8_t action = 0; //modify(0) set(1)
         float magnitude = 0;
-    }; //10 bytes
+        uint8_t smoothingEn = 0; // disable(0) enable(1) manual(2)
+        struct smoothing_ctrl_t smoothingCtrl;
+    }; //11 or 21 bytes
 
     struct positionCMD_t {
-        uint32_t waypoint_id = 0;
+        int32_t waypoint_id = 0;
         uint8_t number_of_waypoints = 0;
         uint8_t action = 0; //modify(0) add(1) remove(2)
         float direction[2]; //lateral, longitudinal in meter
-        struct waypoint_t waypoint;
-    }; //14 or 42 bytes
+        uint8_t smoothingEn = 0; // disable(0) enable(1) manual(2)
+        struct smoothing_ctrl_t smoothingCtrl;
+    }; // 15 or 25 bytes
 
     class header {//24 bytes
     public:
@@ -69,6 +79,13 @@ namespace DVPMod {
           std::memcpy(&cmd.number_of_waypoints, &buffer[28], 1);
           std::memcpy(&cmd.action, &buffer[29], 1);
           std::memcpy(&cmd.magnitude, &buffer[30], 4);
+          std::memcpy(&cmd.smoothingEn, &buffer[34], 1);
+          if (cmd.smoothingEn == 2){
+            std::memcpy(&cmd.smoothingCtrl.beginning, &buffer[35], 1);
+            std::memcpy(&cmd.smoothingCtrl.ending, &buffer[36], 4);
+            std::memcpy(&cmd.smoothingCtrl.beginning_smoothing_extra, &buffer[40], 1);
+            std::memcpy(&cmd.smoothingCtrl.ending__smoothing_extra, &buffer[41], 4);
+          }
         }
     };
 
@@ -82,7 +99,27 @@ namespace DVPMod {
           switch (cmd.action) {
             case 0: std::memcpy(&cmd.direction, &buffer[30], 8);
           }
+          std::memcpy(&cmd.smoothingEn, &buffer[38], 1);
+          if (cmd.smoothingEn == 2){
+            std::memcpy(&cmd.smoothingCtrl.beginning, &buffer[39], 1);
+            std::memcpy(&cmd.smoothingCtrl.ending, &buffer[40], 4);
+            std::memcpy(&cmd.smoothingCtrl.beginning_smoothing_extra, &buffer[44], 1);
+            std::memcpy(&cmd.smoothingCtrl.ending__smoothing_extra, &buffer[45], 4);
+          }
           return 1;
+        }
+    };
+
+    class statusMsg {
+    public:
+        int32_t closest_global_waypoint_id;
+        uint16_t target_global_velocity;
+        uint16_t current_velocity;
+
+        void pack(std::vector<uint8_t> &buffer) {
+          std::memcpy(&buffer[24], &closest_global_waypoint_id, 4);
+          std::memcpy(&buffer[28], &target_global_velocity, 2);
+          std::memcpy(&buffer[30], &current_velocity, 2);
         }
     };
 
@@ -105,6 +142,8 @@ namespace DVPMod {
             case 3:
               positionCmd.unpack(buffer);
               break;
+            case 4:
+              break;
           }
           std::memcpy(reserved, &buffer[24], 100);
           std::memcpy(&crc, &buffer[124], 4);
@@ -126,16 +165,16 @@ namespace DVPMod {
         int data_size = 2800;
 
         bool pack(std::vector<uint8_t> &buffer) {
-          buffer[17] = num_waypoints;
-          std::memcpy(&buffer[18], &first_global_waypoint_id, 4);
-          std::memcpy(&buffer[24], waypoints_array, 2800);
+          buffer[24] = num_waypoints;
+          std::memcpy(&buffer[25], &first_global_waypoint_id, 4);
+          std::memcpy(&buffer[29], waypoints_array, 2800);
           return true;
         }
 
         void unpack(const std::vector<uint8_t> &buffer) {
-          num_waypoints = buffer[17];
-          std::memcpy(&first_global_waypoint_id, &buffer[18], sizeof(first_global_waypoint_id));
-          std::memcpy(waypoints_array, &buffer[24], 2800);
+          num_waypoints = buffer[24];
+          std::memcpy(&first_global_waypoint_id, &buffer[25], sizeof(first_global_waypoint_id));
+          std::memcpy(waypoints_array, &buffer[29], 2800);
         }
     };
 
@@ -143,9 +182,11 @@ namespace DVPMod {
     public:
         DVPMod::header header;
         DVPMod::WaypointsArrayMsg waypoints_array_msg;
+        DVPMod::statusMsg status_msg;
         uint8_t service_msg_id;
         uint8_t service_request_id;
         bool service_accomplished;
+        float processing_time;
         uint8_t reserved[10];
         uint32_t crc;
 
@@ -156,10 +197,13 @@ namespace DVPMod {
             case 1:
               waypoints_array_msg.pack(buffer);
               break;
+            case 4:
+              status_msg.pack(buffer);
           }
           buffer[14] = service_msg_id;
           buffer[15] = service_request_id;
           buffer[16] = static_cast<uint8_t>(service_accomplished);
+          std::memcpy(&buffer[17], &processing_time, 4);
           std::memcpy(&buffer[4082], reserved, 10);
 
           // Calculate CRC
