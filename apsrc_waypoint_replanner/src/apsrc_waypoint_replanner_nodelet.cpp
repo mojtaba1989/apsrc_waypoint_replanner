@@ -348,10 +348,14 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPPositionModify(DVPMod::Request
           int32_t start_id = closest_waypoint_id_;
           status_lock.unlock();
 
-          int32_t end_id =
-                  request.positionCmd.cmd.waypoint_id + request.positionCmd.cmd.number_of_waypoints < base_waypoints_.waypoints.size() ?
-                  request.positionCmd.cmd.waypoint_id + request.positionCmd.cmd.number_of_waypoints - 1: base_waypoints_.waypoints.size() - 1;
-          int32_t where_to_start = request.positionCmd.cmd.waypoint_id > start_id ? request.positionCmd.cmd.waypoint_id:start_id;
+          int32_t end_id;
+          int32_t last_id = base_waypoints_.waypoints.size() - 1;
+          int32_t where_to_start = std::max(start_id, request.positionCmd.cmd.waypoint_id);
+          if (request.positionCmd.cmd.waypoint_id == -1){
+            end_id = std::min(last_id, where_to_start + request.positionCmd.cmd.number_of_waypoints);
+          } else {
+            end_id = std::min(last_id, request.positionCmd.cmd.waypoint_id+request.positionCmd.cmd.number_of_waypoints);
+          }
           float lateral = request.positionCmd.cmd.direction[0];
           float longitudinal = request.positionCmd.cmd.direction[1];
 
