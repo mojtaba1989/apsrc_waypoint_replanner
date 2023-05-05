@@ -135,12 +135,15 @@ if __name__ == '__main__':
     #     reply = ReqMsgUnpack(data)
     #     id = reply.unpack(False)
     #
-    # msg.request_id = 2
-    # time.sleep(15)
-    # s.sendto(msg.pack(40, 10, 1, 3, 1), socket_address)
-    # data, address = s.recvfrom(4096)
-    # reply = ReqMsgUnpack(data)
-    # reply.unpack()
+    start_time = time.time()
+    msg.request_id = 2
+    s.sendto(msg.pack(-1, 10, 1, 20, 1), socket_address)
+    data, address = s.recvfrom(4096)
+    reply = ReqMsgUnpack(data)
+    reply.unpack()
+    end_time = time.time()
+    comm_time = (end_time - start_time - reply.service_processing_time_us/1e6)/2*1e6
+    print("communication time = {} us".format(comm_time))
 
     # msg.request_id = 3
     # time.sleep(.1)
@@ -149,13 +152,13 @@ if __name__ == '__main__':
     # reply = ReqMsgUnpack(data)
     # reply.unpack()
 
-    msg.request_id = 1
-    for _ in range(100):
-        time.sleep(.1)
-        s.sendto(msg.pack(), socket_address)
-        data, address = s.recvfrom(4096)
-        reply = ReqMsgUnpack(data)
-        reply.unpack(False)
+    # msg.request_id = 1
+    # for _ in range(100):
+    #     time.sleep(.1)
+    #     s.sendto(msg.pack(), socket_address)
+    #     data, address = s.recvfrom(4096)
+    #     reply = ReqMsgUnpack(data)
+    #     reply.unpack(False)
 
 
     # msg.request_id = 2

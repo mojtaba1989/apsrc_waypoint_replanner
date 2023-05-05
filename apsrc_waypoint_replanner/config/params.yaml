@@ -1,10 +1,10 @@
 waypoint_replanner:
   # IP and port to bind and listen for incoming velocity profiles
-  server_ip: 127.0.0.1
+  server_ip: 192.168.222.201
   server_port: 1551
 
   # Max speed of all waypoints (km/h)
-  max_speed: 2.0
+  max_speed: 60.0
 
   # Time Out duration (s)
   time_out: 1.0

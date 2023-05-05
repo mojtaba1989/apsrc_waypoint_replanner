@@ -48,10 +48,10 @@ void ApsrcWaypointReplannerNl::onInit()
 
 void ApsrcWaypointReplannerNl::loadParams()
 {
-  pnh_.param<std::string>("server_ip", server_ip_, "127.0.0.1");
-  pnh_.param("server_port", server_port_, 1551);
-  pnh_.param("max_speed", max_speed_, 100.0);
-  pnh_.param("time_out", time_out_, 0.5);
+  pnh_.param<std::string>("/waypoint_replanner/server_ip", server_ip_, "127.0.0.1");
+  pnh_.param("/waypoint_replanner/server_port", server_port_, 1551);
+  pnh_.param("/waypoint_replanner/max_speed", max_speed_, 100.0);
+  pnh_.param("/waypoint_replanner/time_out", time_out_, 0.5);
 
   const ros::Duration OUTDATED_DATA_TIMEOUT(time_out_);
 
@@ -271,10 +271,14 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPVelocityModify(DVPMod::Request
       int32_t start_id = closest_waypoint_id_;
       status_lock.unlock();
 
-      int32_t end_id =
-              request.velocityCmd.cmd.waypoint_id + request.velocityCmd.cmd.number_of_waypoints < base_waypoints_.waypoints.size() ?
-              request.velocityCmd.cmd.waypoint_id + request.velocityCmd.cmd.number_of_waypoints - 1: base_waypoints_.waypoints.size() - 1;
-      int32_t where_to_start = request.velocityCmd.cmd.waypoint_id > start_id ? request.velocityCmd.cmd.waypoint_id:start_id;
+      int32_t end_id;
+      int32_t last_id = base_waypoints_.waypoints.size() - 1;
+      int32_t where_to_start = std::max(start_id, request.velocityCmd.cmd.waypoint_id);
+      if (request.velocityCmd.cmd.waypoint_id == -1){
+        end_id = std::min(last_id, where_to_start + request.velocityCmd.cmd.number_of_waypoints);
+      } else {
+        end_id = std::min(last_id, request.velocityCmd.cmd.waypoint_id+request.velocityCmd.cmd.number_of_waypoints);
+      }
 
       std::unique_lock<std::mutex> wp_lock(waypoints_mtx_);
       switch (request.velocityCmd.cmd.action) {
