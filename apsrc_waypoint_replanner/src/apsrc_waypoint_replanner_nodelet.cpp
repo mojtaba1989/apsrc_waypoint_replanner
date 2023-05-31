@@ -103,7 +103,7 @@ void ApsrcWaypointReplannerNl::generateGlobalPath(DVPMod::VelocityProfile veloci
 
     if (num_waypoints != base_waypoints_.waypoints.size())
     {
-      ROS_ERROR("Waypoints don't match! unable to modify velocities");
+      ROS_INFO("Waypoints don't match! unable to modify velocities");
     }
     else
     {
