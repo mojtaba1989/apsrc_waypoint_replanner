@@ -46,6 +46,7 @@ private:
   std::vector<uint8_t> UDPVelocityModify(DVPMod::RequestMsgs request); // msg_type:2
   std::vector<uint8_t> UDPPositionModify(DVPMod::RequestMsgs request); // msg_type:3
   std::vector<uint8_t> UDPStatusShare(DVPMod::RequestMsgs request); // msg_type:4
+  std::vector<uint8_t> UDPReset(DVPMod::RequestMsgs request); // msg_type:255
 
   // Util functions
   bool startServer();
@@ -71,8 +72,8 @@ private:
   bool udp_server_running_ = false;
   bool received_base_waypoints_ = false;
   autoware_msgs::Lane base_waypoints_;
-  autoware_msgs::Lane current_waypoints_;
-  bool velocity_profile_enabled_ = false;
+  autoware_msgs::Lane original_waypoints_;
+  ros::Time last_msg_time_ = ros::Time::now();
 
   // Current velocity of the vehicle (mm/s)
   uint16_t current_velocity_ = 0;
@@ -101,6 +102,9 @@ private:
 
   // Waypoint Message ID;
   uint8_t msg_id_ = 0;
+
+  // Time gap
+  double time_gap_ = 0.5;
 };
 
 }  // namespace dvp_waypoint_replanner

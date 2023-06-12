@@ -52,6 +52,7 @@ void ApsrcWaypointReplannerNl::loadParams()
   pnh_.param("/waypoint_replanner/server_port", server_port_, 1551);
   pnh_.param("/waypoint_replanner/max_speed", max_speed_, 100.0);
   pnh_.param("/waypoint_replanner/time_out", time_out_, 0.5);
+  pnh_.param("/waypoint_replanner/time_gap", time_gap_, 0.5);
 
   const ros::Duration OUTDATED_DATA_TIMEOUT(time_out_);
 
@@ -60,88 +61,48 @@ void ApsrcWaypointReplannerNl::loadParams()
 
 std::vector<uint8_t> ApsrcWaypointReplannerNl::handleServerResponse(const std::vector<uint8_t>& received_payload)
 {
+  std::vector<uint8_t> udp_msg = {};
   DVPMod::RequestMsgs requestMsg;
   if (!requestMsg.unpack(received_payload))
   {
-    ROS_ERROR("Checksum doesn't match! dropping packet");
+    ROS_WARN("Checksum doesn't match! dropping packet");
+  }
+  else if(ros::Duration(requestMsg.header.ros_time_stamp - last_msg_time_).toSec() <= time_gap_)
+  {
+    ROS_WARN("Possibility of redundant packet! dropping packet");
   }
   else
   {
-    std::vector<uint8_t> udp_msg;
     switch (requestMsg.header.request_id) {
       case 1: // request for waypoints from spectra
         ROS_INFO("Received request: sharing waypoint");
         udp_msg = ApsrcWaypointReplannerNl::UDPGlobalPathShare(requestMsg);
+        last_msg_time_ = requestMsg.header.ros_time_stamp;
         break;
 
       case 2: // request for velocity modification
         ROS_INFO("Received request: velocity modification");
         udp_msg = ApsrcWaypointReplannerNl::UDPVelocityModify(requestMsg);
+        last_msg_time_ = requestMsg.header.ros_time_stamp;
         break;
       case 3: // request for position shift
         ROS_INFO("Received request: position modification");
         udp_msg = ApsrcWaypointReplannerNl::UDPPositionModify(requestMsg);
+        last_msg_time_ = requestMsg.header.ros_time_stamp;
         break;
-      case 4: // request for position shift
+      case 4: // request for status sharing
         ROS_INFO("Received request: sharing status");
         udp_msg = ApsrcWaypointReplannerNl::UDPStatusShare(requestMsg);
+        last_msg_time_ = requestMsg.header.ros_time_stamp;
+        break;
+      case 255: // request for reset
+        ROS_INFO("Received request: reset");
+        udp_msg = ApsrcWaypointReplannerNl::UDPReset(requestMsg);
+        last_msg_time_ = requestMsg.header.ros_time_stamp;
         break;
     }
-    return udp_msg;
   }
-}
-
-void ApsrcWaypointReplannerNl::generateGlobalPath(DVPMod::VelocityProfile velocity_profile)
-{
-  std::unique_lock<std::mutex> wp_lock(waypoints_mtx_);
-
-  if (received_base_waypoints_)
-  {
-    autoware_msgs::Lane modified_waypoints = base_waypoints_;
-
-    uint num_waypoints = modified_waypoints.waypoints.size();
-
-    if (num_waypoints != base_waypoints_.waypoints.size())
-    {
-      ROS_INFO("Waypoints don't match! unable to modify velocities");
-    }
-    else
-    {
-      // Now modify based on UDP packet profile, never exceeding envelope
-      if (velocity_profile.status == 1)
-      {
-        for (uint i = 0; i < 50; ++i)
-        {
-          uint wp_id = i + velocity_profile.first_global_waypoint_id;
-          if (wp_id < num_waypoints)
-          {
-            double profile_vel = static_cast<double>(velocity_profile.target_velocities[i]) / 1000.0;
-
-            modified_waypoints.waypoints[wp_id].twist.twist.linear.x =
-                std::min(profile_vel, max_speed_);
-          }
-        }
-        std::unique_lock<std::mutex> status_lock(status_data_mtx_);
-        velocity_profile_enabled_ = true;
-      }
-      else
-      {
-        std::unique_lock<std::mutex> status_lock(status_data_mtx_);
-        velocity_profile_enabled_ = false;
-      }
-
-      std::unique_lock<std::mutex> status_lock(status_data_mtx_);
-      target_velocity_ = static_cast<uint16_t>(
-          std::round(std::abs(modified_waypoints.waypoints[closest_waypoint_id_].twist.twist.linear.x) * 1000.0));
-    }
-
-    mod_waypoints_pub_.publish(modified_waypoints);
-    base_waypoints_ = modified_waypoints;
-  }
-  else
-  {
-    ROS_WARN_THROTTLE(2.0, "Waiting for waypoints");
-  }
+  return udp_msg;
 }
 
 bool ApsrcWaypointReplannerNl::startServer()
@@ -169,14 +130,8 @@ void ApsrcWaypointReplannerNl::baseWaypointsCallback(const autoware_msgs::Lane::
   {
     std::unique_lock<std::mutex> wp_lock(waypoints_mtx_);
     base_waypoints_ = *base_waypoints;
-    autoware_msgs::Lane mod_waypoints = *base_waypoints;
-//    for (auto& waypoint : max_waypoints.waypoints)
-//    {
-//      waypoint.twist.twist.linear.x = max_speed_;
-//    }
-//
+    original_waypoints_ = *base_waypoints;
     mod_waypoints_pub_.publish(base_waypoints_);
-    current_waypoints_ = mod_waypoints;
     received_base_waypoints_ = true;
   }
 }
@@ -279,6 +234,17 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPVelocityModify(DVPMod::Request
       } else {
         end_id = std::min(last_id, request.velocityCmd.cmd.waypoint_id+request.velocityCmd.cmd.number_of_waypoints);
       }
+      double target_velocity = request.velocityCmd.cmd.magnitude;
+      switch (request.velocityCmd.cmd.unit) {
+        case 0:
+          break;
+        case 1:
+          target_velocity = target_velocity / 3.6;
+          break;
+        case 2:
+          target_velocity = target_velocity * 0.44704;
+          break;
+      }
 
       std::unique_lock<std::mutex> wp_lock(waypoints_mtx_);
       switch (request.velocityCmd.cmd.action) {
@@ -286,18 +252,16 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPVelocityModify(DVPMod::Request
           for (int i = where_to_start; i <= end_id; i++) {
             base_waypoints_.waypoints[i].twist.twist.linear.x =
                     std::min(max_speed_,
-                             base_waypoints_.waypoints[i].twist.twist.linear.x + request.velocityCmd.cmd.magnitude);
+                             base_waypoints_.waypoints[i].twist.twist.linear.x + target_velocity);
           }
-
-
-          ROS_INFO("Following Waypoints has been modified by %s: %s->%s", std::to_string(request.velocityCmd.cmd.magnitude).c_str(),
+          ROS_INFO("Following Waypoints has been modified by %s [m/s]: %s->%s", std::to_string(target_velocity).c_str(),
                    std::to_string(where_to_start).c_str(), std::to_string(end_id).c_str());
           break;
         case 1: // Set
           for (int i = where_to_start; i <= end_id; i++) {
-            base_waypoints_.waypoints[i].twist.twist.linear.x = std::min(max_speed_, static_cast<double>(request.velocityCmd.cmd.magnitude));
+            base_waypoints_.waypoints[i].twist.twist.linear.x = std::min(max_speed_, target_velocity);
           }
-          ROS_INFO("Following Waypoints has been set by %s: %s->%s", std::to_string(request.velocityCmd.cmd.magnitude).c_str(),
+          ROS_INFO("Following Waypoints has been set by %s: %s->%s", std::to_string(target_velocity).c_str(),
                    std::to_string(where_to_start).c_str(), std::to_string(end_id).c_str());
           break;
       }
@@ -331,130 +295,175 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPVelocityModify(DVPMod::Request
 }
 
 std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPPositionModify(DVPMod::RequestMsgs request) {
-      double start_time = ros::Time::now().toSec();
-      DVPMod::ServiceReply udp_msg={};
-      udp_msg.header.msg_id = msg_id_; ++msg_id_;// need to be more meaningful
-      udp_msg.header.request_id = 3;
-      udp_msg.header.data_size_byte = 0;
-      udp_msg.crc = 0;
-      udp_msg.service_msg_id = request.header.msg_id;
-      udp_msg.service_request_id = request.header.request_id;
-      if (request.header.request_id!=3){
-        ROS_ERROR("Bad Message Handler");
-        udp_msg.service_accomplished = false;
-      } else {
-        std::unique_lock<std::mutex> status_lock(status_data_mtx_);
-        if (received_base_waypoints_ and closest_waypoint_id_){
-          int32_t start_id = closest_waypoint_id_;
-          status_lock.unlock();
-
-          int32_t end_id;
-          int32_t last_id = base_waypoints_.waypoints.size() - 1;
-          int32_t where_to_start = std::max(start_id, request.positionCmd.cmd.waypoint_id);
-          if (request.positionCmd.cmd.waypoint_id == -1){
-            end_id = std::min(last_id, where_to_start + request.positionCmd.cmd.number_of_waypoints);
-          } else {
-            end_id = std::min(last_id, request.positionCmd.cmd.waypoint_id+request.positionCmd.cmd.number_of_waypoints);
-          }
-          float lateral = request.positionCmd.cmd.direction[0];
-          float longitudinal = request.positionCmd.cmd.direction[1];
-
-          std::unique_lock<std::mutex> wp_lock(waypoints_mtx_);
-          switch (request.positionCmd.cmd.action) {
-            case 0: //Modify
-              for (int i = where_to_start; i <= end_id + 1; i++) {
-                if (i <= end_id) {
-                  float yaw = tf::getYaw(base_waypoints_.waypoints[i].pose.pose.orientation);
-                  float dx = lateral * sin(yaw) + longitudinal * cos(yaw);
-                  float dy = -lateral * cos(yaw) + longitudinal * sin(yaw);
-                  base_waypoints_.waypoints[i].pose.pose.position.x =
-                          base_waypoints_.waypoints[i].pose.pose.position.x + dx;
-                  base_waypoints_.waypoints[i].pose.pose.position.y =
-                          base_waypoints_.waypoints[i].pose.pose.position.y + dy;
-                }
-                double yaw_i = static_cast<double>(tan((base_waypoints_.waypoints[i].pose.pose.position.y -
-                        base_waypoints_.waypoints[i-1].pose.pose.position.y)/
-                                 base_waypoints_.waypoints[i].pose.pose.position.x -
-                                 base_waypoints_.waypoints[i-1].pose.pose.position.x));
-                base_waypoints_.waypoints[i-1].pose.pose.orientation = tf::createQuaternionMsgFromYaw(yaw_i);
-              }
-              break;
-          }
-          if (request.positionCmd.cmd.smoothingEn == 1){
-            if (where_to_start - 2 >= 0) {
-              geometry_msgs::Point_<std::allocator<void>>::_x_type x_start = base_waypoints_.waypoints[where_to_start - 2].pose.pose.position.x;
-              geometry_msgs::Point_<std::allocator<void>>::_y_type y_start = base_waypoints_.waypoints[where_to_start - 2].pose.pose.position.y;
-              geometry_msgs::Point_<std::allocator<void>>::_x_type x_end = base_waypoints_.waypoints[where_to_start + 2].pose.pose.position.x;
-              geometry_msgs::Point_<std::allocator<void>>::_y_type y_end = base_waypoints_.waypoints[where_to_start + 2].pose.pose.position.y;
-              for (int id = where_to_start - 2; id <= where_to_start + 3; id++) {
-                if (id <= where_to_start + 2) {
-                  base_waypoints_.waypoints[id].pose.pose.position.x = (x_end - x_start) / 4 *
-                                                                       (id - where_to_start - 2) + x_end;
-                  base_waypoints_.waypoints[id].pose.pose.position.y = (y_end - y_start) / 4 *
-                                                                       (id - where_to_start - 2) + y_end;
-                }
-                double yaw_i = static_cast<double>(tan((base_waypoints_.waypoints[id].pose.pose.position.y -
-                                                        base_waypoints_.waypoints[id-1].pose.pose.position.y)/
-                                                       base_waypoints_.waypoints[id].pose.pose.position.x -
-                                                       base_waypoints_.waypoints[id-1].pose.pose.position.x));
-                base_waypoints_.waypoints[id-1].pose.pose.orientation = tf::createQuaternionMsgFromYaw(yaw_i);
-              }
-            }
-            if (end_id + 2 <= base_waypoints_.waypoints.size()) {
-              geometry_msgs::Point_<std::allocator<void>>::_x_type x_start = base_waypoints_.waypoints[end_id - 2].pose.pose.position.x;
-              geometry_msgs::Point_<std::allocator<void>>::_y_type y_start = base_waypoints_.waypoints[end_id - 2].pose.pose.position.y;
-              geometry_msgs::Point_<std::allocator<void>>::_x_type x_end = base_waypoints_.waypoints[end_id + 2].pose.pose.position.x;
-              geometry_msgs::Point_<std::allocator<void>>::_y_type y_end = base_waypoints_.waypoints[end_id + 2].pose.pose.position.y;
-              for (int id = end_id - 2; id <= end_id + 3; id++) {
-                if (id <= end_id + 2) {
-                  base_waypoints_.waypoints[id].pose.pose.position.x = (x_end - x_start) / 4 *
-                                                                       (id - end_id - 2) + x_end;
-                  base_waypoints_.waypoints[id].pose.pose.position.y = (y_end - y_start) / 4 *
-                                                                       (id - end_id - 2) + y_end;
-                }
-                double yaw_i = static_cast<double>(tan((base_waypoints_.waypoints[id].pose.pose.position.y -
-                                                        base_waypoints_.waypoints[id-1].pose.pose.position.y)/
-                                                       base_waypoints_.waypoints[id].pose.pose.position.x -
-                                                       base_waypoints_.waypoints[id-1].pose.pose.position.x));
-                base_waypoints_.waypoints[id-1].pose.pose.orientation = tf::createQuaternionMsgFromYaw(yaw_i);
-              }
-            }
-          }
-          ROS_INFO("Following Waypoints has been shifted by %s, %s: %s->%s", std::to_string(lateral).c_str(),
-                   std::to_string(longitudinal).c_str(), std::to_string(where_to_start).c_str(),
-                   std::to_string(end_id).c_str());
-          mod_waypoints_pub_.publish(base_waypoints_);
-          udp_msg.service_accomplished = true;
-        }
-      }
-      double end_time = ros::Time::now().toSec();
-      udp_msg.processing_time = static_cast<float>((end_time - start_time) * 1000000);
-      udp_msg.header.time_stamp[0] = ros::Time::now().sec;
-      udp_msg.header.time_stamp[1] = ros::Time::now().nsec;
-      return udp_msg.pack();
-    }
-std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPStatusShare(DVPMod::RequestMsgs request) {
+  double start_time = ros::Time::now().toSec();
   DVPMod::ServiceReply udp_msg={};
   udp_msg.header.msg_id = msg_id_; ++msg_id_;// need to be more meaningful
-  udp_msg.header.request_id = 4;
+  udp_msg.header.request_id = 3;
   udp_msg.header.data_size_byte = 0;
   udp_msg.crc = 0;
   udp_msg.service_msg_id = request.header.msg_id;
   udp_msg.service_request_id = request.header.request_id;
-  if (request.header.request_id!=4){
+  if (request.header.request_id!=3){
     ROS_ERROR("Bad Message Handler");
     udp_msg.service_accomplished = false;
   } else {
     std::unique_lock<std::mutex> status_lock(status_data_mtx_);
     if (received_base_waypoints_ and closest_waypoint_id_){
+      int32_t start_id = closest_waypoint_id_;
+      status_lock.unlock();
+
+      int32_t end_id;
+      int32_t last_id = base_waypoints_.waypoints.size() - 1;
+      int32_t where_to_start = std::max(start_id, request.positionCmd.cmd.waypoint_id);
+      if (request.positionCmd.cmd.waypoint_id == -1){
+        end_id = std::min(last_id, where_to_start + request.positionCmd.cmd.number_of_waypoints);
+      } else {
+        end_id = std::min(last_id, request.positionCmd.cmd.waypoint_id+request.positionCmd.cmd.number_of_waypoints);
+      }
+      float lateral = request.positionCmd.cmd.direction;
+      switch (request.positionCmd.cmd.unit) {
+        case 0:
+          break;
+        case 1:
+          lateral = lateral * 0.01;
+          break;
+        case 2:
+          lateral = lateral * 0.0254;
+      }
+
+      std::unique_lock<std::mutex> wp_lock(waypoints_mtx_);
+      switch (request.positionCmd.cmd.action) {
+        case 0: //Modify
+          for (int i = where_to_start; i <= end_id + 1; i++) {
+            if (i <= end_id) {
+              float yaw = tf::getYaw(base_waypoints_.waypoints[i].pose.pose.orientation);
+              float dx = lateral * sin(yaw);
+              float dy = -lateral * cos(yaw);
+              base_waypoints_.waypoints[i].pose.pose.position.x =
+                      base_waypoints_.waypoints[i].pose.pose.position.x + dx;
+              base_waypoints_.waypoints[i].pose.pose.position.y =
+                      base_waypoints_.waypoints[i].pose.pose.position.y + dy;
+            }
+            double yaw_i = static_cast<double>(tan((base_waypoints_.waypoints[i].pose.pose.position.y -
+                    base_waypoints_.waypoints[i-1].pose.pose.position.y)/
+                             base_waypoints_.waypoints[i].pose.pose.position.x -
+                             base_waypoints_.waypoints[i-1].pose.pose.position.x));
+            base_waypoints_.waypoints[i-1].pose.pose.orientation = tf::createQuaternionMsgFromYaw(yaw_i);
+          }
+          break;
+      }
+      if (request.positionCmd.cmd.smoothingEn == 1){
+        if (where_to_start - 2 >= 0) {
+          geometry_msgs::Point_<std::allocator<void>>::_x_type x_start = base_waypoints_.waypoints[where_to_start - 2].pose.pose.position.x;
+          geometry_msgs::Point_<std::allocator<void>>::_y_type y_start = base_waypoints_.waypoints[where_to_start - 2].pose.pose.position.y;
+          geometry_msgs::Point_<std::allocator<void>>::_x_type x_end = base_waypoints_.waypoints[where_to_start + 2].pose.pose.position.x;
+          geometry_msgs::Point_<std::allocator<void>>::_y_type y_end = base_waypoints_.waypoints[where_to_start + 2].pose.pose.position.y;
+          for (int id = where_to_start - 2; id <= where_to_start + 3; id++) {
+            if (id <= where_to_start + 2) {
+              base_waypoints_.waypoints[id].pose.pose.position.x = (x_end - x_start) / 4 *
+                                                                   (id - where_to_start - 2) + x_end;
+              base_waypoints_.waypoints[id].pose.pose.position.y = (y_end - y_start) / 4 *
+                                                                   (id - where_to_start - 2) + y_end;
+            }
+            double yaw_i = static_cast<double>(tan((base_waypoints_.waypoints[id].pose.pose.position.y -
+                                                    base_waypoints_.waypoints[id-1].pose.pose.position.y)/
+                                                   base_waypoints_.waypoints[id].pose.pose.position.x -
+                                                   base_waypoints_.waypoints[id-1].pose.pose.position.x));
+            base_waypoints_.waypoints[id-1].pose.pose.orientation = tf::createQuaternionMsgFromYaw(yaw_i);
+          }
+        }
+        if (end_id + 2 <= base_waypoints_.waypoints.size()) {
+          geometry_msgs::Point_<std::allocator<void>>::_x_type x_start = base_waypoints_.waypoints[end_id - 2].pose.pose.position.x;
+          geometry_msgs::Point_<std::allocator<void>>::_y_type y_start = base_waypoints_.waypoints[end_id - 2].pose.pose.position.y;
+          geometry_msgs::Point_<std::allocator<void>>::_x_type x_end = base_waypoints_.waypoints[end_id + 2].pose.pose.position.x;
+          geometry_msgs::Point_<std::allocator<void>>::_y_type y_end = base_waypoints_.waypoints[end_id + 2].pose.pose.position.y;
+          for (int id = end_id - 2; id <= end_id + 3; id++) {
+            if (id <= end_id + 2) {
+              base_waypoints_.waypoints[id].pose.pose.position.x = (x_end - x_start) / 4 *
+                                                                   (id - end_id - 2) + x_end;
+              base_waypoints_.waypoints[id].pose.pose.position.y = (y_end - y_start) / 4 *
+                                                                   (id - end_id - 2) + y_end;
+            }
+            double yaw_i = static_cast<double>(tan((base_waypoints_.waypoints[id].pose.pose.position.y -
+                                                    base_waypoints_.waypoints[id-1].pose.pose.position.y)/
+                                                   base_waypoints_.waypoints[id].pose.pose.position.x -
+                                                   base_waypoints_.waypoints[id-1].pose.pose.position.x));
+            base_waypoints_.waypoints[id-1].pose.pose.orientation = tf::createQuaternionMsgFromYaw(yaw_i);
+          }
+        }
+      }
+      ROS_INFO("Following Waypoints has been shifted by %s: %s->%s", std::to_string(lateral).c_str(),
+               std::to_string(where_to_start).c_str(), std::to_string(end_id).c_str());
+      mod_waypoints_pub_.publish(base_waypoints_);
+      udp_msg.service_accomplished = true;
+    }
+  }
+  double end_time = ros::Time::now().toSec();
+  udp_msg.processing_time = static_cast<float>((end_time - start_time) * 1000000);
+  udp_msg.header.time_stamp[0] = ros::Time::now().sec;
+  udp_msg.header.time_stamp[1] = ros::Time::now().nsec;
+  return udp_msg.pack();
+}
+
+std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPStatusShare(DVPMod::RequestMsgs request) {
+  DVPMod::ServiceReply udp_msg = {};
+  udp_msg.header.msg_id = msg_id_;
+  ++msg_id_;// need to be more meaningful
+  udp_msg.header.request_id = 4;
+  udp_msg.header.data_size_byte = 0;
+  udp_msg.crc = 0;
+  udp_msg.service_msg_id = request.header.msg_id;
+  udp_msg.service_request_id = request.header.request_id;
+  if (request.header.request_id != 4) {
+    ROS_ERROR("Bad Message Handler");
+    udp_msg.service_accomplished = false;
+  } else {
+    std::unique_lock<std::mutex> status_lock(status_data_mtx_);
+    if (received_base_waypoints_ and closest_waypoint_id_) {
       udp_msg.status_msg.current_velocity = current_velocity_;
       udp_msg.status_msg.target_global_velocity = target_velocity_;
       udp_msg.status_msg.closest_global_waypoint_id = closest_waypoint_id_;
       udp_msg.service_accomplished = true;
     }
+    udp_msg.header.time_stamp[0] = ros::Time::now().sec;
+    udp_msg.header.time_stamp[1] = ros::Time::now().nsec;
+    ROS_INFO("Status has been shared");
+    return udp_msg.pack();
+  }
+}
+
+std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPReset(DVPMod::RequestMsgs request) {
+  double start_time = ros::Time::now().toSec();
+  DVPMod::ServiceReply udp_msg = {};
+  udp_msg.header.msg_id = msg_id_;
+  ++msg_id_;// need to be more meaningful
+  udp_msg.header.request_id = 255;
+  udp_msg.header.data_size_byte = 0;
+  udp_msg.crc = 0;
+  udp_msg.service_msg_id = request.header.msg_id;
+  udp_msg.service_request_id = request.header.request_id;
+  if (request.header.request_id != 255) {
+    ROS_ERROR("Bad Message Handler");
+    udp_msg.service_accomplished = false;
+  } else {
+    std::unique_lock<std::mutex> status_lock(status_data_mtx_);
+    if (received_base_waypoints_ and closest_waypoint_id_){
+      int32_t start_id  = closest_waypoint_id_;
+      int32_t last_id = base_waypoints_.waypoints.size() - 1;
+      status_lock.unlock();
+
+      std::unique_lock<std::mutex> wp_lock(waypoints_mtx_);
+      for (int32_t i = start_id; i <= last_id; i++){
+        base_waypoints_.waypoints[i] = original_waypoints_.waypoints[i];
+      }
+  }
+  mod_waypoints_pub_.publish(base_waypoints_);
+  udp_msg.service_accomplished = true;
+  ROS_INFO("Waypoints have been reset!");
+  double end_time = ros::Time::now().toSec();
+  udp_msg.processing_time = static_cast<float>((end_time - start_time)*1000000);
   udp_msg.header.time_stamp[0] = ros::Time::now().sec;
   udp_msg.header.time_stamp[1] = ros::Time::now().nsec;
-  ROS_INFO("Status has been shared");
   return udp_msg.pack();
   }
 

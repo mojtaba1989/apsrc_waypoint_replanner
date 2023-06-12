@@ -29,25 +29,28 @@ namespace DVPMod {
         int32_t waypoint_id = 0;
         uint8_t number_of_waypoints = 0;
         uint8_t action = 0; //modify(0) set(1)
-        float magnitude = 0;
+        float magnitude = 0; // velocity in mps for unit=0
+        uint8_t unit = 0; // m/s(0) km/h (1) mph (2)
         uint8_t smoothingEn = 0; // disable(0) enable(1) manual(2)
         struct smoothing_ctrl_t smoothingCtrl;
-    }; //11 or 21 bytes
+    }; //12 or 22 bytes
 
     struct positionCMD_t {
         int32_t waypoint_id = 0;
         uint8_t number_of_waypoints = 0;
         uint8_t action = 0; //modify(0) add(1) remove(2)
-        float direction[2]; //lateral, longitudinal in meter
+        float direction; //lateral in meters/ + for right/ - for left
+        uint8_t unit = 0; // m(0) cm(1) inch(2)
         uint8_t smoothingEn = 0; // disable(0) enable(1) manual(2)
         struct smoothing_ctrl_t smoothingCtrl;
-    }; // 15 or 25 bytes
+    }; // 12 or 22 bytes
 
     class header {//24 bytes
     public:
         uint8_t msg_id;
         uint8_t request_id;
         int32_t time_stamp[2];
+        ros::Time ros_time_stamp;
         uint32_t data_size_byte;
         uint8_t data_info[10];
 
@@ -63,7 +66,7 @@ namespace DVPMod {
         bool unpack(const std::vector<uint8_t> &buffer) {
           msg_id = buffer[0];
           request_id = buffer[1];
-          std::memcpy(&time_stamp, &buffer[2], 8);
+          std::memcpy(&ros_time_stamp, &buffer[2], 8);
           std::memcpy(&data_size_byte, &buffer[10], 4);
           std::memcpy(&data_info, &buffer[14], 10);
           return true;
@@ -79,12 +82,13 @@ namespace DVPMod {
           std::memcpy(&cmd.number_of_waypoints, &buffer[28], 1);
           std::memcpy(&cmd.action, &buffer[29], 1);
           std::memcpy(&cmd.magnitude, &buffer[30], 4);
-          std::memcpy(&cmd.smoothingEn, &buffer[34], 1);
+          std::memcpy(&cmd.unit, &buffer[34], 1);
+          std::memcpy(&cmd.smoothingEn, &buffer[35], 1);
           if (cmd.smoothingEn == 2){
-            std::memcpy(&cmd.smoothingCtrl.beginning, &buffer[35], 1);
-            std::memcpy(&cmd.smoothingCtrl.ending, &buffer[36], 4);
-            std::memcpy(&cmd.smoothingCtrl.beginning_smoothing_extra, &buffer[40], 1);
-            std::memcpy(&cmd.smoothingCtrl.ending__smoothing_extra, &buffer[41], 4);
+            std::memcpy(&cmd.smoothingCtrl.beginning, &buffer[36], 1);
+            std::memcpy(&cmd.smoothingCtrl.ending, &buffer[37], 4);
+            std::memcpy(&cmd.smoothingCtrl.beginning_smoothing_extra, &buffer[41], 1);
+            std::memcpy(&cmd.smoothingCtrl.ending__smoothing_extra, &buffer[42], 4);
           }
         }
     };
@@ -97,14 +101,15 @@ namespace DVPMod {
           std::memcpy(&cmd.number_of_waypoints, &buffer[28], 1);
           std::memcpy(&cmd.action, &buffer[29], 1);
           switch (cmd.action) {
-            case 0: std::memcpy(&cmd.direction, &buffer[30], 8);
+            case 0: std::memcpy(&cmd.direction, &buffer[30], 4);
           }
-          std::memcpy(&cmd.smoothingEn, &buffer[38], 1);
+          std::memcpy(&cmd.unit, &buffer[34], 1);
+          std::memcpy(&cmd.smoothingEn, &buffer[35], 1);
           if (cmd.smoothingEn == 2){
-            std::memcpy(&cmd.smoothingCtrl.beginning, &buffer[39], 1);
-            std::memcpy(&cmd.smoothingCtrl.ending, &buffer[40], 4);
-            std::memcpy(&cmd.smoothingCtrl.beginning_smoothing_extra, &buffer[44], 1);
-            std::memcpy(&cmd.smoothingCtrl.ending__smoothing_extra, &buffer[45], 4);
+            std::memcpy(&cmd.smoothingCtrl.beginning, &buffer[36], 1);
+            std::memcpy(&cmd.smoothingCtrl.ending, &buffer[37], 4);
+            std::memcpy(&cmd.smoothingCtrl.beginning_smoothing_extra, &buffer[41], 1);
+            std::memcpy(&cmd.smoothingCtrl.ending__smoothing_extra, &buffer[42], 4);
           }
           return 1;
         }
@@ -123,7 +128,7 @@ namespace DVPMod {
         }
     };
 
-    class RequestMsgs {
+    class RequestMsgs { // 128 bytes
     public:
         DVPMod::header header;
         DVPMod::velocityCMD velocityCmd;
@@ -134,15 +139,17 @@ namespace DVPMod {
         bool unpack(const std::vector<uint8_t> &buffer) {
           header.unpack(buffer);
           switch (header.request_id) {
-            case 1:
+            case 1: //waypoints report
               break;
             case 2:
-              velocityCmd.unpack(buffer);
+              velocityCmd.unpack(buffer); //velocity CMD
               break;
             case 3:
-              positionCmd.unpack(buffer);
+              positionCmd.unpack(buffer); //position CMD
               break;
-            case 4:
+            case 4: // vehicle status report
+              break;
+            case 255: // reset CMD
               break;
           }
           std::memcpy(reserved, &buffer[24], 100);

@@ -29,9 +29,9 @@ class ReqMsg:
         if self.request_id == 1:
             b_msg = b_msg + pack('100x')
         elif self.request_id == 2:
-            b_msg = b_msg + pack('=i2BfB89x', *list(args))
+            b_msg = b_msg + pack('=i2Bf2B88x', *list(args))
         elif self.request_id == 3:
-            b_msg = b_msg + pack('=i2B2fB85x', *list(args))
+            b_msg = b_msg + pack('=i2Bf2B88x', *list(args))
         elif self.request_id == 4:
             b_msg = b_msg + pack('100x')
         b_msg = b_msg + pack('I', int(hex(zlib.crc32(b_msg) & 0xffffffff), base=16))
@@ -136,8 +136,8 @@ if __name__ == '__main__':
     #     id = reply.unpack(False)
     #
     start_time = time.time()
-    msg.request_id = 2
-    s.sendto(msg.pack(-1, 10, 1, 20, 1), socket_address)
+    msg.request_id = 3
+    s.sendto(msg.pack(-1, 10, 0, 1, 1, 1), socket_address)
     data, address = s.recvfrom(4096)
     reply = ReqMsgUnpack(data)
     reply.unpack()
