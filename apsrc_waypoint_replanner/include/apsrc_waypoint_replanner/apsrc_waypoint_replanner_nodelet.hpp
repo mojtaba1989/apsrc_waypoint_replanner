@@ -97,6 +97,9 @@ private:
   // Highest allowed speed of any waypoint on the global path (km/h)
   double max_speed_;
 
+  // Maximum allowed yaw rate
+  double max_yaw_rate_;
+
   // Time out duration
   double time_out_;
 

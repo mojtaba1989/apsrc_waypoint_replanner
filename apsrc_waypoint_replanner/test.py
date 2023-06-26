@@ -34,6 +34,8 @@ class ReqMsg:
             b_msg = b_msg + pack('=i2Bf2B88x', *list(args))
         elif self.request_id == 4:
             b_msg = b_msg + pack('100x')
+        elif self.request_id == 255:
+            b_msg = b_msg + pack('100x')
         b_msg = b_msg + pack('I', int(hex(zlib.crc32(b_msg) & 0xffffffff), base=16))
         self.msg_id = self.msg_id + 1
         return b_msg
@@ -136,8 +138,8 @@ if __name__ == '__main__':
     #     id = reply.unpack(False)
     #
     start_time = time.time()
-    msg.request_id = 3
-    s.sendto(msg.pack(-1, 10, 0, 1, 1, 1), socket_address)
+    msg.request_id = 255 ; s.sendto(msg.pack(), socket_address)
+    # msg.request_id = 3; s.sendto(msg.pack(5, 10, 0, 1, 0, 1), socket_address)
     data, address = s.recvfrom(4096)
     reply = ReqMsgUnpack(data)
     reply.unpack()

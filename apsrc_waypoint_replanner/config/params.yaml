@@ -6,6 +6,10 @@ waypoint_replanner:
   # Max speed of all waypoints (km/h)
   max_speed: 60.0
 
+  # Max Yaw rate
+  max_yaw_rate: 1
+
+
   # Time Out duration (s)
   time_out: 1.0
 
