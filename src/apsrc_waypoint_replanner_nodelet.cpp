@@ -250,19 +250,23 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPVelocityModify(DVPMod::Request
       int32_t start_id = closest_waypoint_id_;
       status_lock.unlock();
 
-      int32_t end_id;
+      int32_t end_id = 0;
       int32_t last_id = base_waypoints_.waypoints.size() - 1;
-      int32_t where_to_start;
-      if (request.velocityCmd.cmd.waypoint_id <= 0){
+      int32_t where_to_start = 0;
+      if (request.positionCmd.cmd.waypoint_id <= 0 and request.positionCmd.cmd.number_of_waypoints > 0){
         where_to_start = std::min(last_id,
-                                  start_id - request.velocityCmd.cmd.waypoint_id);
+                                  start_id - request.positionCmd.cmd.waypoint_id);
         end_id = std::min(last_id,
-                          where_to_start + request.velocityCmd.cmd.number_of_waypoints);
-      } else {
+                          where_to_start + request.positionCmd.cmd.number_of_waypoints);
+      } else if (request.positionCmd.cmd.number_of_waypoints > 0) {
         where_to_start = std::min(last_id,
-                                  request.velocityCmd.cmd.waypoint_id);
+                                  request.positionCmd.cmd.waypoint_id);
         end_id = std::min(last_id,
-                          where_to_start + request.velocityCmd.cmd.number_of_waypoints);
+                          where_to_start + request.positionCmd.cmd.number_of_waypoints);
+      } else if (request.positionCmd.cmd.number_of_waypoints == -1) {
+        where_to_start = std::min(last_id,
+                                  start_id - request.positionCmd.cmd.waypoint_id);
+        end_id = last_id;
       }
       double target_velocity = request.velocityCmd.cmd.magnitude > 0 ? request.velocityCmd.cmd.magnitude : 0;
       switch (request.velocityCmd.cmd.unit) {
@@ -370,7 +374,7 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPPositionModify(DVPMod::Request
                           where_to_start + request.positionCmd.cmd.number_of_waypoints);
       } else if (request.positionCmd.cmd.number_of_waypoints == -1) {
         where_to_start = std::min(last_id,
-                                  request.positionCmd.cmd.waypoint_id);
+                                  start_id - request.positionCmd.cmd.waypoint_id);
         end_id = last_id;
       }
       double lateral = request.positionCmd.cmd.direction;
@@ -388,16 +392,13 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPPositionModify(DVPMod::Request
       switch (request.positionCmd.cmd.action) {
         case 0: //Modify
           for (int i = where_to_start +1; i < end_id; i++) {
-            // float yaw = tf::getYaw(base_waypoints_.waypoints[i].pose.pose.orientation);
-            // float dx = lateral * sin(yaw);
-            // float dy = -lateral * cos(yaw);
-            // base_waypoints_.waypoints[i].pose.pose.position.x += dx;
-            // base_waypoints_.waypoints[i].pose.pose.position.y += dy;
-            // shiftWaypoint(&base_waypoints_ , i, lateral);
+            base_waypoints_ = dvp_plugins::shiftWaypoint(base_waypoints_, i, lateral);
             }
           break;
       }
       if (request.positionCmd.cmd.smoothingEn == 1){
+        base_waypoints_ = dvp_plugins::smoothtransition(base_waypoints_, where_to_start+1, lateral_transition_rate_);
+        base_waypoints_ = dvp_plugins::smoothtransition(base_waypoints_, end_id, lateral_transition_rate_);
       }
       ROS_INFO("Following Waypoints has been shifted by %s: %s->%s", std::to_string(lateral).c_str(),
                std::to_string(where_to_start).c_str(), std::to_string(end_id).c_str());
