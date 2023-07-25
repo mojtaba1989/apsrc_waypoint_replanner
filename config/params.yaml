@@ -17,4 +17,4 @@ waypoint_replanner:
   time_gap: 6
 
   # 1m lateral transition duration (s) (Normalized to 1m)
-  lateral_transition_duration: 2.0 # Based on 3m in 6s for normal behavior
+  lateral_transition_duration: 2 # Based on 3m in 6s for normal behavior

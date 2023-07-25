@@ -62,6 +62,7 @@ void ApsrcWaypointReplannerNl::loadParams()
   pnh_.param("/waypoint_replanner/time_out", time_out_, 0.5);
   pnh_.param("/waypoint_replanner/time_gap", time_gap_, 0.5);
   pnh_.param("/waypoint_replanner/lateral_transition_duration", lateral_transition_duration_, 2.0);
+  lateral_transition_rate_ = 1 / lateral_transition_duration_;
 
 
   const ros::Duration OUTDATED_DATA_TIMEOUT(time_out_);
