@@ -108,6 +108,10 @@ private:
 
   // Time gap
   double time_gap_ = 0.5;
+
+  // 1m lateral transition time (s) (Normalized to 1m)
+  double lateral_transition_duration_ = 2.0;
+  double lateral_transition_rate_ = 1 / lateral_transition_duration_;
 };
 
 }  // namespace dvp_waypoint_replanner

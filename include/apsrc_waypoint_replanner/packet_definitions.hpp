@@ -27,23 +27,23 @@ namespace DVPMod {
 
     struct velocityCMD_t {
         int32_t waypoint_id = 0;
-        uint8_t number_of_waypoints = 0;
+        int32_t number_of_waypoints = 0;
         uint8_t action = 0; //modify(0) set(1)
         float magnitude = 0; // velocity in mps for unit=0
         uint8_t unit = 0; // m/s(0) km/h (1) mph (2)
         uint8_t smoothingEn = 0; // disable(0) enable(1) manual(2)
         struct smoothing_ctrl_t smoothingCtrl;
-    }; //12 or 22 bytes
+    }; //15 or 25 bytes
 
     struct positionCMD_t {
         int32_t waypoint_id = 0;
-        uint8_t number_of_waypoints = 0;
+        int32_t number_of_waypoints = 0;
         uint8_t action = 0; //modify(0) add(1) remove(2)
         float direction; //lateral in meters/ + for right/ - for left
         uint8_t unit = 0; // m(0) cm(1) inch(2)
         uint8_t smoothingEn = 0; // disable(0) enable(1) manual(2)
         struct smoothing_ctrl_t smoothingCtrl;
-    }; // 12 or 22 bytes
+    }; // 15 or 25 bytes
 
     class header {//24 bytes
     public:
@@ -79,16 +79,16 @@ namespace DVPMod {
 
         bool unpack(const std::vector<uint8_t> &buffer) {
           std::memcpy(&cmd.waypoint_id, &buffer[24], 4);
-          std::memcpy(&cmd.number_of_waypoints, &buffer[28], 1);
-          std::memcpy(&cmd.action, &buffer[29], 1);
-          std::memcpy(&cmd.magnitude, &buffer[30], 4);
-          std::memcpy(&cmd.unit, &buffer[34], 1);
-          std::memcpy(&cmd.smoothingEn, &buffer[35], 1);
+          std::memcpy(&cmd.number_of_waypoints, &buffer[28], 4);
+          std::memcpy(&cmd.action, &buffer[32], 1);
+          std::memcpy(&cmd.magnitude, &buffer[33], 4);
+          std::memcpy(&cmd.unit, &buffer[37], 1);
+          std::memcpy(&cmd.smoothingEn, &buffer[38], 1);
           if (cmd.smoothingEn == 2){
-            std::memcpy(&cmd.smoothingCtrl.beginning, &buffer[36], 1);
-            std::memcpy(&cmd.smoothingCtrl.ending, &buffer[37], 4);
-            std::memcpy(&cmd.smoothingCtrl.beginning_smoothing_extra, &buffer[41], 1);
-            std::memcpy(&cmd.smoothingCtrl.ending__smoothing_extra, &buffer[42], 4);
+            std::memcpy(&cmd.smoothingCtrl.beginning, &buffer[39], 1);
+            std::memcpy(&cmd.smoothingCtrl.ending, &buffer[40], 4);
+            std::memcpy(&cmd.smoothingCtrl.beginning_smoothing_extra, &buffer[44], 1);
+            std::memcpy(&cmd.smoothingCtrl.ending__smoothing_extra, &buffer[45], 4);
           }
         }
     };
@@ -98,18 +98,18 @@ namespace DVPMod {
         struct positionCMD_t cmd;
         int unpack(const std::vector<uint8_t> &buffer){
           std::memcpy(&cmd.waypoint_id, &buffer[24], 4);
-          std::memcpy(&cmd.number_of_waypoints, &buffer[28], 1);
-          std::memcpy(&cmd.action, &buffer[29], 1);
+          std::memcpy(&cmd.number_of_waypoints, &buffer[28], 4);
+          std::memcpy(&cmd.action, &buffer[32], 1);
           switch (cmd.action) {
-            case 0: std::memcpy(&cmd.direction, &buffer[30], 4);
+            case 0: std::memcpy(&cmd.direction, &buffer[33], 4);
           }
-          std::memcpy(&cmd.unit, &buffer[34], 1);
-          std::memcpy(&cmd.smoothingEn, &buffer[35], 1);
+          std::memcpy(&cmd.unit, &buffer[37], 1);
+          std::memcpy(&cmd.smoothingEn, &buffer[38], 1);
           if (cmd.smoothingEn == 2){
-            std::memcpy(&cmd.smoothingCtrl.beginning, &buffer[36], 1);
-            std::memcpy(&cmd.smoothingCtrl.ending, &buffer[37], 4);
-            std::memcpy(&cmd.smoothingCtrl.beginning_smoothing_extra, &buffer[41], 1);
-            std::memcpy(&cmd.smoothingCtrl.ending__smoothing_extra, &buffer[42], 4);
+            std::memcpy(&cmd.smoothingCtrl.beginning, &buffer[39], 1);
+            std::memcpy(&cmd.smoothingCtrl.ending, &buffer[40], 4);
+            std::memcpy(&cmd.smoothingCtrl.beginning_smoothing_extra, &buffer[44], 1);
+            std::memcpy(&cmd.smoothingCtrl.ending__smoothing_extra, &buffer[45], 4);
           }
           return 1;
         }
