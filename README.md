@@ -6,6 +6,8 @@ The node updates the global path accordingly, and then sends back the status mes
 
 ## Configuration
 
+salammmm
+
 See `config/params.yaml` for more details regarding configurable parameters such as network IPs and ports.
 
 ## Functional Overview
