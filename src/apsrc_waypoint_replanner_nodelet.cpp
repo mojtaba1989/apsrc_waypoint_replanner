@@ -254,19 +254,19 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPVelocityModify(DVPMod::Request
       int32_t end_id = 0;
       int32_t last_id = base_waypoints_.waypoints.size() - 1;
       int32_t where_to_start = 0;
-      if (request.positionCmd.cmd.waypoint_id <= 0 and request.positionCmd.cmd.number_of_waypoints > 0){
+      if (request.velocityCmd.cmd.waypoint_id <= 0 and request.velocityCmd.cmd.number_of_waypoints > 0){
         where_to_start = std::min(last_id,
-                                  start_id - request.positionCmd.cmd.waypoint_id);
+                                  start_id - request.velocityCmd.cmd.waypoint_id);
         end_id = std::min(last_id,
-                          where_to_start + request.positionCmd.cmd.number_of_waypoints);
-      } else if (request.positionCmd.cmd.number_of_waypoints > 0) {
+                          where_to_start + request.velocityCmd.cmd.number_of_waypoints);
+      } else if (request.velocityCmd.cmd.number_of_waypoints > 0) {
         where_to_start = std::min(last_id,
-                                  request.positionCmd.cmd.waypoint_id);
+                                  request.velocityCmd.cmd.waypoint_id);
         end_id = std::min(last_id,
-                          where_to_start + request.positionCmd.cmd.number_of_waypoints);
-      } else if (request.positionCmd.cmd.number_of_waypoints == -1) {
+                          where_to_start + request.velocityCmd.cmd.number_of_waypoints);
+      } else if (request.velocityCmd.cmd.number_of_waypoints == -1) {
         where_to_start = std::min(last_id,
-                                  start_id - request.positionCmd.cmd.waypoint_id);
+                                  start_id - request.velocityCmd.cmd.waypoint_id);
         end_id = last_id;
       }
       double target_velocity = request.velocityCmd.cmd.magnitude > 0 ? request.velocityCmd.cmd.magnitude : 0;
