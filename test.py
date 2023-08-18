@@ -140,7 +140,7 @@ if __name__ == '__main__':
     start_time = time.time()
     # msg.request_id = 255 ; s.sendto(msg.pack(), socket_address)
     # msg.request_id = 3; s.sendto(msg.pack(-5, 100, 0, 3, 0, 1), socket_address)
-    msg.request_id = 2; s.sendto(msg.pack(-1, -1, 1, 30, 2, 0), socket_address)
+    msg.request_id = 3; s.sendto(msg.pack(-1, -1, 0, -3, 0, 0), socket_address)
     data, address = s.recvfrom(4096)
     reply = ReqMsgUnpack(data)
     reply.unpack()
