@@ -1,5 +1,17 @@
 <launch>
-  <node pkg="apsrc_waypoint_replanner" type="apsrc_waypoint_replanner_node" name="apsrc_waypoint_replanner" output="screen" />
-
-  <rosparam command="load" file="$(find apsrc_waypoint_replanner)/config/params.yaml" />
+  <arg name="ros_msg_only" default="true"/>
+  <arg name="port" default="1551"/>
+  <arg name="ip" default="127.0.0.1"/>
+  <arg name="max_speed" default="60.0"/>
+  <arg name="time_gap" default="0.5"/>
+  <arg name="lateral_transition_duration" default="2"/>
+  
+  <node pkg="apsrc_waypoint_replanner" type="apsrc_waypoint_replanner_node" name="apsrc_waypoint_replanner" output="screen" >
+    <param name="ros_msg_only" value="$(arg ros_msg_only)"/>
+    <param name="server_port" value="$(arg port)"/>
+    <param name="server_ip" value="$(arg ip)"/>
+    <param name="max_speed" value="$(arg max_speed)"/>
+    <param name="time_gap" value="$(arg time_gap)"/>
+    <param name="lateral_transition_duration" value="$(arg lateral_transition_duration)"/>
+  </node>
 </launch>

@@ -39,7 +39,7 @@ namespace dvp_plugins
       double sign = area > 0 ? 1:-1;
       while (not end_process){
         double yaw0 = tf::getYaw(waypoints.waypoints[id-1].pose.pose.orientation);
-        double yaw1 = tf::getYaw(waypoints.waypoints[id].pose.pose.orientation);
+        // double yaw1 = tf::getYaw(waypoints.waypoints[id].pose.pose.orientation);
         double A = std::tan(yaw0);
         double C = waypoints.waypoints[id-1].pose.pose.position.y -
                    waypoints.waypoints[id-1].pose.pose.position.x * A;
@@ -63,6 +63,7 @@ namespace dvp_plugins
 
   autoware_msgs::Lane shiftWaypoint(autoware_msgs::Lane waypoints, uint32_t id, double shift)
   {
+    autoware_msgs::Lane tmp = {};
     if (id < waypoints.waypoints.size() and shift != 0){
       float yaw = tf::getYaw(waypoints.waypoints[id].pose.pose.orientation);
       float dx = shift * sin(yaw);
@@ -71,6 +72,7 @@ namespace dvp_plugins
       waypoints.waypoints[id].pose.pose.position.y += dy;
       return waypoints;
     }
+    return tmp;
   }
 
   bool updateQuaternion(autoware_msgs::Lane waypoints, uint32_t id)
@@ -87,9 +89,8 @@ namespace dvp_plugins
       double angle = std::atan2(dy, dx);
       waypoints.waypoints[id].pose.pose.orientation = tf::createQuaternionMsgFromYaw(angle);
       return true;
-    } else {
-      return false;
     }
+    return false;
   }
 };
 #endif

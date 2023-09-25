@@ -1,6 +1,6 @@
 <package format="2">
   <name>apsrc_waypoint_replanner</name>
-  <version>0.0.1</version>
+  <version>1.0.1</version>
   <description>Waypoint Replanner</description>
   <author email="mbahramg@mtu.edu">Mojtaba Bahramgiri</author>
   <maintainer email="mbahramg@mtu.edu">Mojtaba Bahramgiri</maintainer>
@@ -8,6 +8,7 @@
 
   <buildtool_depend>catkin</buildtool_depend>
   <depend>autoware_msgs</depend>
+  <depend>apsrc_msgs</depend>
   <depend>network_interface</depend>
   <depend>nodelet</depend>
   <depend>roscpp</depend>

@@ -16,9 +16,11 @@
 #include <geometry_msgs/TwistStamped.h>
 #include <tf/transform_datatypes.h>
 #include <std_msgs/Int32.h>
+#include <apsrc_msgs/CommandAccomplished.h>
+#include <apsrc_msgs/CommandReceived.h>
+
 
 #include "apsrc_waypoint_replanner/packet_definitions.hpp"
-
 const ros::Duration OUTDATED_DATA_TIMEOUT(0.5);
 
 namespace apsrc_waypoint_replanner
@@ -36,27 +38,26 @@ private:
 
   // Subscriber callbacks
   void velocityCallback(const geometry_msgs::TwistStamped::ConstPtr& current_velocity);
-  void vehicleStatusCallback(const autoware_msgs::VehicleStatus::ConstPtr& vehicle_status);
   void closestWaypointCallback(const std_msgs::Int32::ConstPtr& closest_waypoint_id);
   void baseWaypointsCallback(const autoware_msgs::Lane::ConstPtr& base_waypoints);
 
   // UDP server callback for received message
   std::vector<uint8_t> handleServerResponse(const std::vector<uint8_t>& received_payload);
   std::vector<uint8_t> UDPGlobalPathShare(DVPMod::RequestMsgs request); // msg_type:1
-  std::vector<uint8_t> UDPVelocityModify(DVPMod::RequestMsgs request); // msg_type:2
-  std::vector<uint8_t> UDPPositionModify(DVPMod::RequestMsgs request); // msg_type:3
-  std::vector<uint8_t> UDPStatusShare(DVPMod::RequestMsgs request); // msg_type:4
-  std::vector<uint8_t> UDPReset(DVPMod::RequestMsgs request); // msg_type:255
+  std::vector<uint8_t> UDPVelocityModify(DVPMod::RequestMsgs request, ros::Time stamp); // msg_type:2
+  std::vector<uint8_t> UDPPositionModify(DVPMod::RequestMsgs request, ros::Time stamp); // msg_type:3
+  std::vector<uint8_t> UDPReset(DVPMod::RequestMsgs request, ros::Time stamp); // msg_type:255
 
   // Util functions
   bool startServer();
-  void generateGlobalPath(DVPMod::VelocityProfile velocity_profile);
 
   // Nodehandles
   ros::NodeHandle nh_, pnh_;
 
   // Publishers
   ros::Publisher mod_waypoints_pub_;
+  ros::Publisher udp_request_pub_;
+  ros::Publisher udp_report_pub_;
 
 
   // Subscribers
@@ -79,10 +80,6 @@ private:
   uint16_t current_velocity_ = 0;
   ros::Time current_velocity_rcvd_time_;
 
-  // DBW in manual or autonomy
-  bool dbw_engaged_ = false;
-  ros::Time dbw_engaged_rcvd_time_;
-
   // Closest global waypoint id
   int32_t closest_waypoint_id_ = 0;
   ros::Time closest_waypoint_id_rcvd_time_;
@@ -97,17 +94,14 @@ private:
   // Highest allowed speed of any waypoint on the global path (km/h)
   double max_speed_;
 
-  // Maximum allowed yaw rate
-  double max_yaw_rate_;
-
-  // Time out duration
-  double time_out_;
-
   // Waypoint Message ID;
   uint8_t msg_id_ = 0;
 
   // Time gap
   double time_gap_ = 0.5;
+
+  // Report type
+  bool ros_msg_only_ = true;
 
   // 1m lateral transition time (s) (Normalized to 1m)
   double lateral_transition_duration_ = 2.0;

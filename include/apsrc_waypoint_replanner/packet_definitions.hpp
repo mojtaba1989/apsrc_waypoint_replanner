@@ -90,6 +90,7 @@ namespace DVPMod {
             std::memcpy(&cmd.smoothingCtrl.beginning_smoothing_extra, &buffer[44], 1);
             std::memcpy(&cmd.smoothingCtrl.ending__smoothing_extra, &buffer[45], 4);
           }
+          return true;
         }
     };
 
