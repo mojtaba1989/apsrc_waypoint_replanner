@@ -67,10 +67,10 @@ The `packet_definitions.h` file defines various packet structures and classes fo
 
 ### Rquest Message Structure:`RequestMsgs`
 Total length: 256 bytes
-- header: `header` 24 bytes
-- body: one of followings
-1. `velocityCMD`: 15 bytes + 213 NULL bytes
-2. `positionCMD`: 15 bytes + 213 NULL bytes
-3. `veocityVectorCMD`: 205 bytes + 23 NULL bytes
-4. `positionVectorCMD`: 205 bytes + 23 NULL bytes
+1. header: `header` 24 bytes
+2.  body: only one of following commands
+    - `velocityCMD`: 15 bytes + 213 NULL bytes
+    - `positionCMD`: 15 bytes + 213 NULL bytes
+    - `veocityVectorCMD`: 205 bytes + 23 NULL bytes
+    - `positionVectorCMD`: 205 bytes + 23 NULL bytes
 - `CRC`: 4 bytes
