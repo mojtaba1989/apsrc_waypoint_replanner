@@ -1,5 +1,5 @@
-#ifndef DVP_WAYPOINT_REPLANNER_ApsrcWaypointReplannerNl_H
-#define DVP_WAYPOINT_REPLANNER_ApsrcWaypointReplannerNl_H
+#ifndef APSRC_WAYPOINT_REPLANNER_Nl_H
+#define APSRC_WAYPOINT_REPLANNER_Nl_H
 
 #include <ros/ros.h>
 #include <ros/package.h>
@@ -43,10 +43,11 @@ private:
 
   // UDP server callback for received message
   std::vector<uint8_t> handleServerResponse(const std::vector<uint8_t>& received_payload);
-  std::vector<uint8_t> UDPGlobalPathShare(DVPMod::RequestMsgs request); // msg_type:1
-  std::vector<uint8_t> UDPVelocityModify(DVPMod::RequestMsgs request, ros::Time stamp); // msg_type:2
-  std::vector<uint8_t> UDPPositionModify(DVPMod::RequestMsgs request, ros::Time stamp); // msg_type:3
-  std::vector<uint8_t> UDPReset(DVPMod::RequestMsgs request, ros::Time stamp); // msg_type:255
+  std::vector<uint8_t> UDPVelocityModify(DWPMod::RequestMsgs request, ros::Time stamp); // msg_type:2
+  std::vector<uint8_t> UDPPositionModify(DWPMod::RequestMsgs request, ros::Time stamp); // msg_type:3
+  std::vector<uint8_t> UDPVelocityVecModify(DWPMod::RequestMsgs request, ros::Time stamp); // msg_type:4
+  std::vector<uint8_t> UDPPositionVecModify(DWPMod::RequestMsgs request, ros::Time stamp); // msg_type:5
+  std::vector<uint8_t> UDPReset(DWPMod::RequestMsgs request, ros::Time stamp); // msg_type:255
 
   // Util functions
   bool startServer();
@@ -62,7 +63,7 @@ private:
 
   // Subscribers
   ros::Subscriber base_waypoints_sub_;
-  ros::Subscriber current_velocity_sub_, vehicle_status_sub_, closest_waypoint_sub_;
+  ros::Subscriber current_velocity_sub_, closest_waypoint_sub_;
 
 
   // Internal state
@@ -75,6 +76,9 @@ private:
   autoware_msgs::Lane base_waypoints_;
   autoware_msgs::Lane original_waypoints_;
   ros::Time last_msg_time_ = ros::Time::now();
+
+  // Empty udp message
+  std::vector<uint8_t> empty_udp_msg_;
 
   // Current velocity of the vehicle (mm/s)
   uint16_t current_velocity_ = 0;
@@ -100,13 +104,10 @@ private:
   // Time gap
   double time_gap_ = 0.5;
 
-  // Report type
-  bool ros_msg_only_ = true;
-
   // 1m lateral transition time (s) (Normalized to 1m)
   double lateral_transition_duration_ = 2.0;
   double lateral_transition_rate_ = 1 / lateral_transition_duration_;
 };
 
-}  // namespace dvp_waypoint_replanner
-#endif  // DVP_WAYPOINT_REPLANNER_ApsrcWaypointReplannerNl_H
+}  // namespace apsrc_waypoint_replanner
+#endif  // APSRC_WAYPOINT_REPLANNER_Nl_H
