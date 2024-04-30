@@ -15,7 +15,7 @@
 #include <autoware_msgs/VehicleStatus.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <tf/transform_datatypes.h>
-#include <std_msgs/Int32.h>
+// #include <std_msgs/Int32.h>
 #include <apsrc_msgs/CommandAccomplished.h>
 #include <apsrc_msgs/CommandReceived.h>
 
