@@ -15,12 +15,16 @@
 #include <autoware_msgs/VehicleStatus.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <tf/transform_datatypes.h>
-// #include <std_msgs/Int32.h>
+#include <std_msgs/Int32.h>
 #include <apsrc_msgs/CommandAccomplished.h>
 #include <apsrc_msgs/CommandReceived.h>
+#include <raptor_dbw_msgs/DriverInputReport.h>
+#include <raptor_dbw_msgs/TurnSignal.h>
+
 
 
 #include "apsrc_waypoint_replanner/packet_definitions.hpp"
+
 const ros::Duration OUTDATED_DATA_TIMEOUT(0.5);
 
 namespace apsrc_waypoint_replanner
@@ -40,6 +44,7 @@ private:
   void velocityCallback(const geometry_msgs::TwistStamped::ConstPtr& current_velocity);
   void closestWaypointCallback(const std_msgs::Int32::ConstPtr& closest_waypoint_id);
   void baseWaypointsCallback(const autoware_msgs::Lane::ConstPtr& base_waypoints);
+  void driverInputCallback(const raptor_dbw_msgs::DriverInputreport::ConstPtr& msg);
 
   // UDP server callback for received message
   std::vector<uint8_t> handleServerResponse(const std::vector<uint8_t>& received_payload);
@@ -64,6 +69,7 @@ private:
   // Subscribers
   ros::Subscriber base_waypoints_sub_;
   ros::Subscriber current_velocity_sub_, closest_waypoint_sub_;
+  ros::Subscriber driver_input_sub_;
 
 
   // Internal state
@@ -107,6 +113,9 @@ private:
   // 1m lateral transition time (s) (Normalized to 1m)
   double lateral_transition_duration_ = 2.0;
   double lateral_transition_rate_ = 1 / lateral_transition_duration_;
+
+  // Driver Input Control
+  bool turn_signal_is_ready_ = false;
 };
 
 }  // namespace apsrc_waypoint_replanner

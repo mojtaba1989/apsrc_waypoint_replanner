@@ -171,6 +171,49 @@ void ApsrcWaypointReplannerNl::closestWaypointCallback(const std_msgs::Int32::Co
   closest_waypoint_id_rcvd_time_ = ros::Time::now();
 }
 
+void ApsrcWaypointReplannerNl::driverInputCallback(const raptor_dbw_msgs::DriverInputReport::ConstPtr& msg)
+{
+  if (msg->turn_signal.value == raptor_dbw_msgs::TurnSignal::None){
+    turn_signal_is_ready_ = true;
+    return;
+  }
+
+  if (turn_signal_is_ready_ && received_base_waypoints_ && closest_waypoint_id_){
+    int32_t last_id = base_waypoints_.waypoints.size() - 1;
+    int32_t start_id = closest_waypoint_id_ + 5;
+    double lateral = 3.6;
+    if (last_id - start_id <= 5){
+      ROS_WARN("Not enough waypoints available for safe lane change!");
+      turn_signal_is_ready_ = false;
+      return;
+    }
+
+    switch (msg->turn_signal.value)
+    {
+    case raptor_dbw_msgs::TurnSignal::LEFT:
+      lateral = -3.6;
+      break;
+    case raptor_dbw_msgs::TurnSignal::RIGHT:
+      break;
+    default:
+      ROS_WARN("Unknow Turn Signal State!");
+      turn_signal_is_ready_ = false;
+      return;
+    }
+
+    std::unique_lock<std::mutex> wp_lock(waypoints_mtx_);
+    for (size_t i = start_id; i < end_id; i++) {
+      base_waypoints_ = awp_plugins::shiftWaypoint(base_waypoints_, i, lateral);
+      }
+    break;
+    
+    base_waypoints_ = awp_plugins::smoothtransition(base_waypoints_, start_id, lateral_transition_rate_);
+    ROS_INFO("Lane Change Command starting at %s", std::to_string(start_id).c_str());
+    turn_signal_is_ready_ = false;
+    mod_waypoints_pub_.publish(base_waypoints_);
+  }
+}
+
 std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPVelocityModify(DWPMod::RequestMsgs request, ros::Time stamp) {
   apsrc_msgs::CommandAccomplished ros_msg = {};
   ros_msg.msg_id = request.header.msg_id;
