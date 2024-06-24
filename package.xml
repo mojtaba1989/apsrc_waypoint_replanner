@@ -16,6 +16,7 @@
   <depend>roslint</depend>
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>raptor_dbw_msgs</depend>
 
   <export>
     <nodelet plugin="${prefix}/nodelets.xml"/>

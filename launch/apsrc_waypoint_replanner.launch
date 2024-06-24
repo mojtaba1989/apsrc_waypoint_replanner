@@ -4,6 +4,15 @@
   <arg name="max_speed" default="60.0"/>
   <arg name="time_gap" default="0.5"/>
   <arg name="lateral_transition_duration" default="2"/>
+
+  <arg name="driver_input_allowed" default="true"/>
+  <arg name="LANE_WIDTH" default="3.2"/>
+  <arg name="LNG_GAP_MAX" default="2.5"/>
+  <arg name="LNG_GAP_MIN" default="1.0"/>
+  <arg name="LNG_GAP_STEP" default="0.5"/>
+  <arg name="STOP_DISTANCE" default="11.0"/>
+  <arg name="SPEED_MOD_STEP" default="0.44704"/>
+
   
   <node pkg="apsrc_waypoint_replanner" type="apsrc_waypoint_replanner_node" name="apsrc_waypoint_replanner" output="screen" >
     <param name="server_port" value="$(arg port)"/>
@@ -11,5 +20,17 @@
     <param name="max_speed" value="$(arg max_speed)"/>
     <param name="time_gap" value="$(arg time_gap)"/>
     <param name="lateral_transition_duration" value="$(arg lateral_transition_duration)"/>
+
+    <param name="LANE_WIDTH" value="$(arg LANE_WIDTH)"/>
+    <param name="LNG_GAP_MAX" value="$(arg LNG_GAP_MAX)"/>
+    <param name="LNG_GAP_MIN" value="$(arg LNG_GAP_MIN)"/>
+    <param name="LNG_GAP_STEP" value="$(arg LNG_GAP_STEP)"/>
+    <param name="STOP_DISTANCE" value="$(arg STOP_DISTANCE)"/>
+    <param name="SPEED_MOD_STEP" value="$(arg SPEED_MOD_STEP)"/>
   </node>
+
+  <group if="$(arg driver_input_allowed)">
+    <node pkg="apsrc_waypoint_replanner" type="apsrc_waypoint_replanner_driver_extension_node" name="apsrc_waypoint_replanner_driver_extension"/>
+
+  </group>
 </launch>

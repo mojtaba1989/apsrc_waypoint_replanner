@@ -39,15 +39,15 @@ struct velocityProfileCMD_t
 {
   int32_t waypoint_id;
   uint8_t num_of_waypoints;
-  float velocity_vector[50];
-}; // 205 bytes
+  float velocity_vector[200];
+}; // 805 bytes
 
 struct positionProfileCMD_t
 {
   int32_t waypoint_id;
   uint8_t num_of_waypoints;
-  float lat_shift_vector[50];
-}; // 205 bytes
+  float lat_shift_vector[200];
+}; // 805 bytes
 
 class header {//24 bytes
 public:
@@ -119,8 +119,8 @@ public:
   int unpack(const std::vector<uint8_t> &buffer, int idx){
     std::memcpy(&cmd.waypoint_id, &buffer[idx], 4);
     std::memcpy(&cmd.num_of_waypoints, &buffer[idx+4], 1);
-    std::memcpy(&cmd.velocity_vector, &buffer[idx+5], 200);
-    return idx+205;
+    std::memcpy(&cmd.velocity_vector, &buffer[idx+5], 800);
+    return idx+805;
   }
 };
 
@@ -130,19 +130,18 @@ public:
   int unpack(const std::vector<uint8_t> &buffer, int idx){
     std::memcpy(&cmd.waypoint_id, &buffer[idx], 4);
     std::memcpy(&cmd.num_of_waypoints, &buffer[idx+4], 1);
-    std::memcpy(&cmd.lat_shift_vector, &buffer[idx+5], 200);
-  return idx+205;
+    std::memcpy(&cmd.lat_shift_vector, &buffer[idx+5], 800);
+  return idx+805;
   }
 };
 
-class RequestMsgs { // 256 bytes
+class RequestMsgs { // 1024 bytes
 public:
   DWPMod::header header;
   velocityCMD velocityCmd;
   positionCMD positionCmd;
   positionVectorCMD positionVectorCmd;
   veocityVectorCMD velocityVectorCmd;
-  uint8_t reserved[33];
   uint32_t crc;
 
   bool unpack(const std::vector<uint8_t> &buffer) {
@@ -165,9 +164,9 @@ public:
       case 255: // reset CMD
         break;
     }
-    std::memcpy(&crc, &buffer[252], 4);
+    std::memcpy(&crc, &buffer[1020], 4);
     boost::crc_32_type msg_crc;
-    msg_crc.process_bytes(&buffer[0], 252);
+    msg_crc.process_bytes(&buffer[0], 1020);
     if (crc == msg_crc.checksum()) {
       return true;
     } else {

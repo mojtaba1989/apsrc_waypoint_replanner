@@ -41,13 +41,13 @@ The `packet_definitions.h` file defines various packet structures and classes fo
 
 - `waypoint_id`: int32_t. ID of the waypoint.
 - `num_of_waypoints`: uint8_t. Number of waypoints.
-- `velocity_vector`: float[50]. Array of velocity vectors.
+- `velocity_vector`: float[200]. Array of velocity vectors.
 
 ### `positionProfileCMD_t`
 
 - `waypoint_id`: int32_t. ID of the waypoint.
 - `num_of_waypoints`: uint8_t. Number of waypoints.
-- `lat_shift_vector`: float[50]. Array of lateral shift vectors.
+- `lat_shift_vector`: float[200]. Array of lateral shift vectors.
 
 ### `header`
 
@@ -66,11 +66,46 @@ The `packet_definitions.h` file defines various packet structures and classes fo
 - `RequestMsgs`: Class for unpacking request message packets.
 
 ### Rquest Message Structure:`RequestMsgs`
-Total length: 256 bytes
+Total length: 1024 bytes
 1. header: `header` 24 bytes
 2.  body: only one of following commands
-    - `velocityCMD`: 15 bytes + 213 NULL bytes
-    - `positionCMD`: 15 bytes + 213 NULL bytes
-    - `veocityVectorCMD`: 205 bytes + 23 NULL bytes
-    - `positionVectorCMD`: 205 bytes + 23 NULL bytes
+    - `velocityCMD`: 15 bytes + 981 NULL bytes
+    - `positionCMD`: 15 bytes + 981 NULL bytes
+    - `veocityVectorCMD`: 805 bytes + 191 NULL bytes
+    - `positionVectorCMD`: 805 bytes + 191 NULL bytes
 - `CRC`: 4 bytes
+
+# Waypoint Replanner Driver Extension Node (Pacifica ONLY)
+
+This ROS package implements a waypoint replanner driver extension node that processes driver input reports to generate and publish corresponding driver input commands.
+
+## Functionality Overview
+
+The node subscribes to driver input reports, interprets various driver inputs such as turn signals, cruise control buttons, and lane change requests, and publishes appropriate commands for the waypoint replanner.
+
+### Topics
+
+#### Subscribed Topics
+
+- **`/vehicle/driver_input_report`** (type: `raptor_dbw_msgs::DriverInputReport`)
+  - Receives driver input reports which include turn signals and various cruise control buttons.
+
+#### Published Topics
+
+- **`waypoint_replanner/driver_command`** (type: `apsrc_msgs::DriverInputCommand`)
+  - Publishes interpreted driver commands such as lane changes, speed adjustments, and waypoint resets.
+
+<img src="https://github.com/mojtaba1989/apsrc_waypoint_replanner/blob/master//SteeringWheel.jpg" alt="Disks" width="600"/>
+
+### Driver Commands
+
+- **Left Lane Change**: Triggered by the left turn signal.
+- **Right Lane Change**: Triggered by the right turn signal.
+- **Speed Up**: Triggered by the cruise control accelerate button.
+- **Speed Down**: Triggered by the cruise control decelerate button.
+- **Increase Time Gap**: Triggered by the adaptive cruise increase distance button.
+- **Decrease Time Gap**: Triggered by the adaptive cruise decrease distance button.
+- **Reset Waypoints**: Triggered by the cruise resume button.
+
+This functionality allows for effective and responsive control of the waypoint replanner based on driver inputs, enhancing the vehicle's adaptive capabilities.
+

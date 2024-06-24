@@ -14,6 +14,7 @@ set(catkin_deps
     roslib
     roslint
     std_msgs
+    raptor_dbw_msgs
 )
 
 find_package(catkin REQUIRED ${catkin_deps})
@@ -31,8 +32,6 @@ roslint_cpp()
 ## Build ##
 ###########
 
-## Specify additional locations of header files
-## Your package locations should be listed before other locations
 include_directories(
     include
     ${catkin_INCLUDE_DIRS}
@@ -57,6 +56,14 @@ target_link_libraries(${PROJECT_NAME}_node
     ${catkin_LIBRARIES}
 )
 
+add_executable(${PROJECT_NAME}_driver_extension_node
+    src/${PROJECT_NAME}_driver_extension_node.cpp
+)
+
+target_link_libraries(${PROJECT_NAME}_driver_extension_node
+  ${catkin_LIBRARIES}
+)
+
 ############
 # Install ##
 ############
@@ -64,6 +71,7 @@ target_link_libraries(${PROJECT_NAME}_node
 install(TARGETS
     ${PROJECT_NAME}_node
     ${PROJECT_NAME}_nodelets
+    ${PROJECT_NAME}_driver_extension_node
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
