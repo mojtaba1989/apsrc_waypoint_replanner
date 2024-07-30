@@ -100,7 +100,7 @@ private:
   std::vector<uint8_t> empty_udp_msg_;
 
   // Current velocity of the vehicle (m/s)
-  uint16_t current_velocity_ = 0;
+  double current_velocity_ = 0;
   ros::Time current_velocity_rcvd_time_;
 
   // Closest global waypoint id

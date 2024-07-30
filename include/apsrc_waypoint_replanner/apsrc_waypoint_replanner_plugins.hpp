@@ -58,16 +58,12 @@ autoware_msgs::Lane smoothtransition(autoware_msgs::Lane waypoints, uint32_t id,
 
 autoware_msgs::Lane shiftWaypoint(autoware_msgs::Lane waypoints, uint32_t id, double shift)
 {
-  autoware_msgs::Lane tmp = {};
-  if (id < waypoints.waypoints.size() and shift != 0){
-    float yaw = tf::getYaw(waypoints.waypoints[id].pose.pose.orientation);
-    float dx = shift * sin(yaw);
-    float dy = -shift * cos(yaw);
-    waypoints.waypoints[id].pose.pose.position.x += dx;
-    waypoints.waypoints[id].pose.pose.position.y += dy;
-    return waypoints;
-  }
-  return tmp;
+  float yaw = tf::getYaw(waypoints.waypoints[id].pose.pose.orientation);
+  float dx = shift * sin(yaw);
+  float dy = -shift * cos(yaw);
+  waypoints.waypoints[id].pose.pose.position.x += dx;
+  waypoints.waypoints[id].pose.pose.position.y += dy;
+  return waypoints;
 }
 
 bool updateQuaternion(autoware_msgs::Lane waypoints, uint32_t id)

@@ -282,12 +282,12 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPVelocityModify(DWPMod::Request
       }
     }
     mod_waypoints_pub_.publish(base_waypoints_);
-    ros_msg.request_accomplished = true;
-    ros_msg.header.stamp = ros::Time::now();
-    wp_based_report report;
-    report.report = ros_msg;
-    report.waypoint = start_id;
-    report_stack_.push_back(report);
+    // ros_msg.request_accomplished = true;
+    // ros_msg.header.stamp = ros::Time::now();
+    // wp_based_report report;
+    // report.report = ros_msg;
+    // report.waypoint = start_id;
+    // report_stack_.push_back(report);
   }
   return empty_udp_msg_;
 }
@@ -347,12 +347,12 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPPositionModify(DWPMod::Request
               std::to_string(where_to_start).c_str(), std::to_string(end_id).c_str());
     
     mod_waypoints_pub_.publish(base_waypoints_);
-    ros_msg.request_accomplished = true;
-    ros_msg.header.stamp = ros::Time::now();
-    wp_based_report report;
-    report.report = ros_msg;
-    report.waypoint = start_id;
-    report_stack_.push_back(report);
+    // ros_msg.request_accomplished = true;
+    // ros_msg.header.stamp = ros::Time::now();
+    // wp_based_report report;
+    // report.report = ros_msg;
+    // report.waypoint = start_id;
+    // report_stack_.push_back(report);
   }
   return empty_udp_msg_;
 }
@@ -377,6 +377,12 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPVelocityVecModify(DWPMod::Requ
       idx++;
     }
 
+    while((where_to_start + idx) < last_id){
+      base_waypoints_.waypoints[where_to_start + idx].twist.twist.linear.x =
+       request.velocityVectorCmd.cmd.velocity_vector[request.velocityVectorCmd.cmd.num_of_waypoints-1];
+      idx++;
+    }
+
     mod_waypoints_pub_.publish(base_waypoints_);
     ros_msg.request_accomplished = true;
     ROS_INFO("Following Waypoints velocity has been set using vector: %s->%s",
@@ -386,12 +392,13 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPVelocityVecModify(DWPMod::Requ
   }
 
   mod_waypoints_pub_.publish(base_waypoints_);
-  ros_msg.request_accomplished = true;
-  ros_msg.header.stamp = ros::Time::now();
-  wp_based_report report;
-  report.report = ros_msg;
-  report.waypoint = where_to_start;
-  report_stack_.push_back(report);
+  // ros_msg.request_accomplished = true;
+  // ros_msg.header.stamp = ros::Time::now();
+  // wp_based_report report;
+  // report.report = ros_msg;
+  // report.waypoint = where_to_start;
+  // report_stack_.push_back(report);
+  return empty_udp_msg_;
 }
 
 std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPPositionVecModify(DWPMod::RequestMsgs request, ros::Time stamp) {
@@ -411,7 +418,17 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPPositionVecModify(DWPMod::Requ
     std::unique_lock<std::mutex> wp_lock(waypoints_mtx_);
     int32_t idx = 0;
     while(idx < request.positionVectorCmd.cmd.num_of_waypoints && (where_to_start + idx) < last_id){
-      base_waypoints_ = awp_plugins::shiftWaypoint(base_waypoints_, where_to_start + idx, request.positionVectorCmd.cmd.lat_shift_vector[idx]);
+      base_waypoints_ = awp_plugins::shiftWaypoint(base_waypoints_,
+                                                   where_to_start + idx,
+                                                   request.positionVectorCmd.cmd.lat_shift_vector[idx]);
+      ++idx;
+    }
+
+    while((where_to_start + idx) < last_id){
+      base_waypoints_ = awp_plugins::shiftWaypoint(base_waypoints_,
+                                                   where_to_start + idx,
+                                                   request.positionVectorCmd.cmd.lat_shift_vector[
+                                                    request.positionVectorCmd.cmd.num_of_waypoints-1]);
       ++idx;
     }
 
@@ -424,12 +441,13 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPPositionVecModify(DWPMod::Requ
   }
     
   mod_waypoints_pub_.publish(base_waypoints_);
-  ros_msg.request_accomplished = true;
-  ros_msg.header.stamp = ros::Time::now();
-  wp_based_report report;
-  report.report = ros_msg;
-  report.waypoint = where_to_start;
-  report_stack_.push_back(report);
+  // ros_msg.request_accomplished = true;
+  // ros_msg.header.stamp = ros::Time::now();
+  // wp_based_report report;
+  // report.report = ros_msg;
+  // report.waypoint = where_to_start;
+  // report_stack_.push_back(report);
+  return empty_udp_msg_;
 }
 
 std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPReset(DWPMod::RequestMsgs request, ros::Time stamp) {
@@ -456,7 +474,7 @@ std::vector<uint8_t> ApsrcWaypointReplannerNl::UDPReset(DWPMod::RequestMsgs requ
   }
   
   ros_msg.header.stamp = ros::Time::now();
-  udp_report_pub_.publish(ros_msg);
+  // udp_report_pub_.publish(ros_msg);
   return empty_udp_msg_;
 }
 
@@ -589,7 +607,7 @@ void ApsrcWaypointReplannerNl::driverInputCallback(const apsrc_msgs::DriverInput
     return;
 
   case apsrc_msgs::DriverInputCommand::SPEED_UP:
-    if (received_base_waypoints_ && closest_waypoint_id_ && current_velocity_){
+    if (received_base_waypoints_ && closest_waypoint_id_){
       int32_t last_id = base_waypoints_.waypoints.size() - 1;
       int32_t start_id = closest_waypoint_id_;
       if (last_id - start_id <= 5){
@@ -608,7 +626,7 @@ void ApsrcWaypointReplannerNl::driverInputCallback(const apsrc_msgs::DriverInput
     return;
 
   case apsrc_msgs::DriverInputCommand::SPEED_DOWN:
-    if (received_base_waypoints_ && closest_waypoint_id_ && current_velocity_){
+    if (received_base_waypoints_ && closest_waypoint_id_){
       int32_t last_id = base_waypoints_.waypoints.size() - 1;
       int32_t start_id = closest_waypoint_id_;
       if (last_id - start_id <= 5){

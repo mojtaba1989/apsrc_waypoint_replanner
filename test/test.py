@@ -25,17 +25,19 @@ class ReqMsg:
         self.data_info = (0, ) * 10
 
     def pack(self, *args):
-        b_msg = pack("=2B3I10B", *list(flatten_tuple(tuple(vars(self).values()))))
+        b_msg = pack("=2B2iI10B", *list(flatten_tuple(tuple(vars(self).values()))))
         if self.request_id == 1:
-            b_msg = b_msg + pack('100x')
-        elif self.request_id == 2:
-            b_msg = b_msg + pack('=2iBf2B85x', *list(args))
-        elif self.request_id == 3:
-            b_msg = b_msg + pack('=2iBf2B85x', *list(args))
-        elif self.request_id == 4:
-            b_msg = b_msg + pack('100x')
+            b_msg = b_msg + pack('996x') #dummy
+        elif self.request_id == 2: #velocity
+            b_msg = b_msg + pack('=2iBf2B981x', *list(args)) 
+        elif self.request_id == 3: #position
+            b_msg = b_msg + pack('=2iBf2B981x', *list(args))
+        elif self.request_id == 4: #velocity vectro
+            b_msg = b_msg + pack('=iB200f191x', *list(args))
+        elif self.request_id == 5: #position vectro
+            b_msg = b_msg + pack('=iB200f191x', *list(args))
         elif self.request_id == 255:
-            b_msg = b_msg + pack('100x')
+            b_msg = b_msg + pack('996')
         b_msg = b_msg + pack('I', int(hex(zlib.crc32(b_msg) & 0xffffffff), base=16))
         self.msg_id = self.msg_id + 1
         return b_msg
