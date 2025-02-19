@@ -8,7 +8,6 @@ set(catkin_deps
     apsrc_msgs
     autoware_msgs
     geometry_msgs
-    network_interface
     nodelet
     roscpp
     roslib

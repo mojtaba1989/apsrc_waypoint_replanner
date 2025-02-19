@@ -5,9 +5,6 @@
 #include <ros/package.h>
 #include <nodelet/nodelet.h>
 #include <pluginlib/class_list_macros.h>
-
-#include <network_interface/udp_server.h>
-#include <network_interface/network_interface.h>
 #include <thread>
 #include <mutex>
 
@@ -20,12 +17,12 @@
 #include <apsrc_msgs/CommandReceived.h>
 #include <apsrc_msgs/AvpCommand.h>
 #include <apsrc_msgs/DriverInputCommand.h>
+#include <apsrc_msgs/VelocityCommand.h>
+#include <apsrc_msgs/PositionCommand.h>
+#include <apsrc_msgs/VelocityArrayCommand.h>
+#include <apsrc_msgs/PositionArrayCommand.h>
 #include <raptor_dbw_msgs/DriverInputReport.h>
 #include <raptor_dbw_msgs/TurnSignal.h>
-
-
-
-#include "apsrc_waypoint_replanner/packet_definitions.hpp"
 
 const ros::Duration OUTDATED_DATA_TIMEOUT(0.5);
 
@@ -54,27 +51,18 @@ private:
   void baseWaypointsCallback(const autoware_msgs::Lane::ConstPtr& base_waypoints);
   void driverInputCallback(const apsrc_msgs::DriverInputCommand::ConstPtr& cmd);
 
-  // UDP server callback for received message
-  std::vector<uint8_t> handleServerResponse(const std::vector<uint8_t>& received_payload);
-  std::vector<uint8_t> UDPVelocityModify(DWPMod::RequestMsgs request, ros::Time stamp); // msg_type:2
-  std::vector<uint8_t> UDPPositionModify(DWPMod::RequestMsgs request, ros::Time stamp); // msg_type:3
-  std::vector<uint8_t> UDPVelocityVecModify(DWPMod::RequestMsgs request, ros::Time stamp); // msg_type:4
-  std::vector<uint8_t> UDPPositionVecModify(DWPMod::RequestMsgs request, ros::Time stamp); // msg_type:5
-  std::vector<uint8_t> UDPTest(DWPMod::RequestMsgs request, ros::Time stamp); // msg_type:254
-  std::vector<uint8_t> UDPReset(DWPMod::RequestMsgs request, ros::Time stamp); // msg_type:255
-  
-
-  // Util functions
-  bool startServer();
-  void report_manager();
+  // MABx Subscriber callbacks
+  void velocityCmdCallback(const apsrc_msgs::VelocityCommand::ConstPtr& msg);
+  void positionCmdCallback(const apsrc_msgs::PositionCommand::ConstPtr& msg);
+  void velocityArrayCmdCallback(const apsrc_msgs::VelocityArrayCommand::ConstPtr& msg);
+  void positionArrayCmdCallback(const apsrc_msgs::PositionArrayCommand::ConstPtr& msg);
+  void resetCmdCallback(const apsrc_msgs::DriverInputCommand::ConstPtr& msg);
 
   // Nodehandles
   ros::NodeHandle nh_, pnh_;
 
   // Publishers
   ros::Publisher mod_waypoints_pub_;
-  ros::Publisher udp_request_pub_;
-  ros::Publisher udp_report_pub_;
   ros::Publisher eco_cruise_pub_;
 
 
@@ -83,49 +71,36 @@ private:
   ros::Subscriber current_velocity_sub_, closest_waypoint_sub_;
   ros::Subscriber driver_input_sub_;
 
+  // MABx Subscribers
+  ros::Subscriber vel_sub_;
+  ros::Subscriber pos_sub_;
+  ros::Subscriber vel_arr_sub_;
+  ros::Subscriber pos_arr_sub_;
+  ros::Subscriber reset_sub_;
 
   // Internal state
-  AS::Network::UDPServer udp_server_;
   std::thread udp_server_thread_;
   std::mutex waypoints_mtx_;
   std::mutex status_data_mtx_;
-  bool udp_server_running_ = false;
   bool received_base_waypoints_ = false;
   autoware_msgs::Lane base_waypoints_;
   autoware_msgs::Lane original_waypoints_;
-  ros::Time last_msg_time_ = ros::Time::now();
-  std::vector<wp_based_report> report_stack_;
-
-  // Empty udp message
-  std::vector<uint8_t> empty_udp_msg_;
 
   // Current velocity of the vehicle (m/s)
   double current_velocity_ = 0;
-  ros::Time current_velocity_rcvd_time_;
 
   // Closest global waypoint id
-  int32_t closest_waypoint_id_ = 0;
-  ros::Time closest_waypoint_id_rcvd_time_;
+  int32_t closest_waypoint_id_ = -1;
 
-  // Parameters
-  std::string server_ip_;
-  int server_port_;
-
-  // Highest allowed speed of any waypoint on the global path (km/h)
-  double max_speed_;
-
-  // Waypoint Message ID;
-  uint8_t msg_id_ = 0;
-
-  // Time gap
-  double msg_interval_ = 0.5;
 
   // 1m lateral transition time (s) (Normalized to 1m)
   double lateral_transition_duration_ = 2.0;
   double lateral_transition_rate_ = 1 / lateral_transition_duration_;
 
-  // Driver Input Commands config
+  double A_MAX_COMFORT_ = 1.5;
+  double J_MAX_COMFORT_ = 1.0;
 
+  // Driver Input Commands config
   double LANE_WIDTH_ = 3.2;
 
   apsrc_msgs::AvpCommand lng_gap_ctrl_;
