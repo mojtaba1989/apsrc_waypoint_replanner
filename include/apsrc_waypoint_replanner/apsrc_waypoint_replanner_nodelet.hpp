@@ -21,6 +21,7 @@
 #include <apsrc_msgs/PositionCommand.h>
 #include <apsrc_msgs/VelocityArrayCommand.h>
 #include <apsrc_msgs/PositionArrayCommand.h>
+#include <apsrc_msgs/BlindSpotChecker.h>
 #include <raptor_dbw_msgs/DriverInputReport.h>
 #include <raptor_dbw_msgs/TurnSignal.h>
 
@@ -57,6 +58,7 @@ private:
   void velocityArrayCmdCallback(const apsrc_msgs::VelocityArrayCommand::ConstPtr& msg);
   void positionArrayCmdCallback(const apsrc_msgs::PositionArrayCommand::ConstPtr& msg);
   void resetCmdCallback(const apsrc_msgs::DriverInputCommand::ConstPtr& msg);
+  void blindSpotCallback(const apsrc_msgs::BlindSpotChecker::ConstPtr& msg);
 
   // Nodehandles
   ros::NodeHandle nh_, pnh_;
@@ -70,6 +72,7 @@ private:
   ros::Subscriber base_waypoints_sub_;
   ros::Subscriber current_velocity_sub_, closest_waypoint_sub_;
   ros::Subscriber driver_input_sub_;
+  ros::Subscriber blind_spot_sub_;
 
   // MABx Subscribers
   ros::Subscriber vel_sub_;
@@ -110,6 +113,11 @@ private:
   double STOP_DISTANCE_ = 11.0;
 
   double SPEED_MOD_STEP_ = 0.44704;
+
+  // Blind Spot checker for virtual vehicles
+  bool blind_spot_not_clear_left = false;
+  bool blind_spot_not_clear_right = false;
+  ros::Time blind_spot_update_ = ros::Time::now();
 };
 
 }  // namespace apsrc_waypoint_replanner

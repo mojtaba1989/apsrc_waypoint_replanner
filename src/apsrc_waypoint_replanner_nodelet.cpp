@@ -296,6 +296,16 @@ void ApsrcWaypointReplannerNl::driverInputCallback(const apsrc_msgs::DriverInput
         ROS_WARN("Not enough waypoints available for safe lane change!");
         return;
       }
+      if (blind_spot_not_clear_left) {
+        if (ros::Time::now() - blind_spot_update_ < ros::Duration(1.0)) {
+          ROS_WARN("Blind spot not clear!");
+          return;
+        } else {
+          blind_spot_update_ = ros::Time::now();
+          blind_spot_not_clear_left = false;
+          blind_spot_not_clear_right = false;
+        }
+      }
       std::unique_lock<std::mutex> wp_lock(waypoints_mtx_);
       int32_t idx = 0;
       while(idx < lat_shift_vector.size() && (start_id + idx) <= last_id){
@@ -319,6 +329,16 @@ void ApsrcWaypointReplannerNl::driverInputCallback(const apsrc_msgs::DriverInput
       if (last_id - start_id < lat_shift_vector.size()){
         ROS_WARN("Not enough waypoints available for safe lane change!");
         return;
+      }
+      if (blind_spot_not_clear_right) {
+        if (ros::Time::now() - blind_spot_update_ < ros::Duration(1.0)) {
+          ROS_WARN("Blind spot not clear!");
+          return;
+        } else {
+          blind_spot_update_ = ros::Time::now();
+          blind_spot_not_clear_left = false;
+          blind_spot_not_clear_right = false;
+        }
       }
       std::unique_lock<std::mutex> wp_lock(waypoints_mtx_);
       int32_t idx = 0;
@@ -436,6 +456,13 @@ void ApsrcWaypointReplannerNl::velocityCallback(const geometry_msgs::TwistStampe
 {
   std::unique_lock<std::mutex> lock(status_data_mtx_);
   current_velocity_ = current_velocity->twist.linear.x;
+}
+
+void ApsrcWaypointReplannerNl::blindSpotCallback(const apsrc_msgs::BlindSpotChecker::ConstPtr& msg)
+{
+  blind_spot_update_ = msg->header.stamp;
+  blind_spot_not_clear_left = msg->left;
+  blind_spot_not_clear_right = msg->right; 
 }
 
 }  // namespace apsrc_waypoint_replanner
