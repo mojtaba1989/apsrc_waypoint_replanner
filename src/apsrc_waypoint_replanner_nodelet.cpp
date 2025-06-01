@@ -31,6 +31,7 @@ void ApsrcWaypointReplannerNl::onInit()
   closest_waypoint_sub_ = nh_.subscribe("closest_waypoint", 1, &ApsrcWaypointReplannerNl::closestWaypointCallback, this);
   base_waypoints_sub_   = nh_.subscribe("base_waypoints", 1, &ApsrcWaypointReplannerNl::baseWaypointsCallback, this);
   driver_input_sub_     = nh_.subscribe("waypoint_replanner/driver_command", 1, &ApsrcWaypointReplannerNl::driverInputCallback, this);
+  blind_spot_sub_       = nh_.subscribe("/v2x/BlindSpotChecker", 1, &ApsrcWaypointReplannerNl::blindSpotCallback, this);
 
   // MABx Subscribers
   vel_sub_      = nh_.subscribe("/mabx_commands/velocity_cmd", 1, &ApsrcWaypointReplannerNl::velocityCmdCallback, this);
